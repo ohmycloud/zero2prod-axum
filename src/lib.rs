@@ -19,14 +19,13 @@ async fn greet(Path(name): Path<String>) -> impl IntoResponse {
 }
 
 pub fn run(
-    address: &str,
+    listener: std::net::TcpListener,
 ) -> Result<Serve<TcpListener, IntoMakeService<Router>, Router>, std::io::Error> {
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/", get(index))
         .route("/{name}", get(greet));
 
-    let listener = std::net::TcpListener::bind(address)?;
     let listener = TcpListener::from_std(listener)?;
     println!("Listening on {:?}", listener.local_addr());
 
