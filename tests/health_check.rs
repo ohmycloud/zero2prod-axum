@@ -3,7 +3,7 @@
 //
 // You can inspect what code gets generated using
 // `cargo expand --test health_check`
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn health_check_works() {
     // Arrange
     spawn_app();
