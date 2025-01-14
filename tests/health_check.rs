@@ -3,7 +3,7 @@
 //
 // You can inspect what code gets generated using
 // `cargo expand --test health_check`
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn health_check_works() {
     // Arrange
     spawn_app();
@@ -14,7 +14,7 @@ async fn health_check_works() {
 
     // Act
     let response = client
-        .get("http://127.0.0.1:3333/hello")
+        .get("http://127.0.0.1:3333/health_check")
         .send()
         .await
         .expect("Falied to execute reqwest.");
@@ -30,4 +30,5 @@ fn spawn_app() {
         .expect("Failed to bind address")
         .into_future();
     let _ = tokio::spawn(server);
+    println!("app spawned.");
 }
