@@ -1,7 +1,13 @@
 pub mod health_check;
 
 use crate::health_check::health_check;
-use axum::{Router, extract::Path, response::IntoResponse, routing::get};
+use axum::{
+    Router,
+    extract::Path,
+    response::IntoResponse,
+    routing::{IntoMakeService, get},
+    serve::Serve,
+};
 use tokio::net::TcpListener;
 
 async fn index() -> impl IntoResponse {
@@ -12,7 +18,7 @@ async fn greet(Path(name): Path<String>) -> impl IntoResponse {
     format!("Hello, {}", name)
 }
 
-pub async fn run() -> Result<(), std::io::Error> {
+pub async fn run() -> Result<Serve<TcpListener, IntoMakeService<Router>, Router>, std::io::Error> {
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/", get(index))
@@ -21,8 +27,6 @@ pub async fn run() -> Result<(), std::io::Error> {
     let listener = TcpListener::bind("0.0.0.0:3333").await.unwrap();
     println!("Listening on {:?}", listener.local_addr());
 
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
-    Ok(())
+    let server = axum::serve(listener, app.into_make_service());
+    Ok(server)
 }
