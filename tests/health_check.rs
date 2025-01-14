@@ -26,7 +26,7 @@ async fn health_check_works() {
 
 // Launch our application in the background
 fn spawn_app() {
-    let server = zero2prod::run()
+    let server = zero2prod::run("127.0.0.1:0")
         .expect("Failed to bind address")
         .into_future();
     let _ = tokio::spawn(server);
