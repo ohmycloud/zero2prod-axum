@@ -13,3 +13,6 @@ name = "zero2prod"
 [dependencies]
 axum = "0.8.1"
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+reqwest = "0.12.12"
