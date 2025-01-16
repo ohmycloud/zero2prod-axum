@@ -3,6 +3,7 @@ use std::net::TcpListener;
 // Launch our application in the background
 fn spawn_app() -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    listener.set_nonblocking(true).unwrap();
     let port = listener.local_addr().unwrap().port();
     let server = zero2prod::run(listener)
         .expect("Failed to bind address")
