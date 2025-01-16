@@ -4,8 +4,9 @@ use crate::health_check::health_check;
 use axum::{
     Router,
     extract::Path,
-    response::IntoResponse,
-    routing::{IntoMakeService, get},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{IntoMakeService, get, post},
     serve::Serve,
 };
 use tokio::net::TcpListener;
@@ -18,11 +19,16 @@ async fn greet(Path(name): Path<String>) -> impl IntoResponse {
     format!("Hello, {}", name)
 }
 
+async fn subscribe() -> Response {
+    StatusCode::OK.into_response()
+}
+
 pub fn run(
     listener: std::net::TcpListener,
 ) -> Result<Serve<TcpListener, IntoMakeService<Router>, Router>, std::io::Error> {
     let app = Router::new()
         .route("/health_check", get(health_check))
+        .route("/subscriptions", post(subscribe))
         .route("/", get(index))
         .route("/{name}", get(greet));
 
