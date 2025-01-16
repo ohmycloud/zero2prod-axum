@@ -26,11 +26,12 @@ async fn subscribe() -> Response {
 
 #[derive(Deserialize)]
 struct FormData {
-    username: String,
+    email: String,
+    name: String,
 }
 
-async fn home(Form(form): Form<FormData>) -> String {
-    format!("Welcome: {}", form.username)
+async fn home(Form(form): Form<FormData>) -> Response {
+    format!("Welcome: {}", form.name).into_response()
 }
 
 pub fn run(
