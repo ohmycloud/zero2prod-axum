@@ -12,6 +12,7 @@ name = "zero2prod"
 
 [dependencies]
 axum = "0.8.1"
+config = "0.15.6"
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 
