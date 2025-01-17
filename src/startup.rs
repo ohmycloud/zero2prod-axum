@@ -1,4 +1,4 @@
-use crate::routes::health_check::*;
+use crate::routes::{health_check::*, subscribe};
 use axum::{
     Router,
     routing::{IntoMakeService, get, post},
@@ -13,7 +13,6 @@ pub fn run(
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/", get(index))
-        .route("/home", post(home))
         .route("/{name}", get(greet));
 
     let listener = TcpListener::from_std(listener)?;
