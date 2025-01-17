@@ -31,5 +31,11 @@ features = [
     "with-uuid",
 ]
 
+[dependencies.entity]
+path = "entity"
+
+[dependencies.migration]
+path = "migration"
+
 [dev-dependencies]
 reqwest = "0.12.12"
