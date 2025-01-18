@@ -1,21 +1,35 @@
-use entity::entitties::prelude::*;
+use entity::entities::prelude::*;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 use sea_orm::sqlx::{ConnectOptions, Connection};
-use sea_orm::{Database, DbConn, EntityTrait};
+use sea_orm::{Database, DatabaseConnection, DbConn, EntityTrait};
 use std::net::TcpListener;
 use zero2prod::configuration::get_configuration;
 
+pub struct TestApp {
+    pub address: String,
+    pub db_connection: DatabaseConnection,
+}
+
 // Launch our application in the background
-fn spawn_app() -> String {
+async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     listener.set_nonblocking(true).unwrap();
     let port = listener.local_addr().unwrap().port();
-    let server = zero2prod::startup::run(listener)
+    let address = format!("http://127.0.0.1:{}", port);
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    let connection_string = configuration.database.connection_string();
+    let db_connection = Database::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
+    let server = zero2prod::startup::run(listener, db_connection.clone())
         .expect("Failed to bind address")
         .into_future();
     let _ = tokio::spawn(server);
-    format!("http://127.0.0.1:{}", port)
+    TestApp {
+        address,
+        db_connection,
+    }
 }
 
 // `tokio::test` is the testing equivalent of `tokio::main`.
@@ -26,7 +40,7 @@ fn spawn_app() -> String {
 #[tokio::test]
 async fn health_check_works() {
     // Arrange
-    let address = spawn_app();
+    let app = spawn_app().await;
 
     // We need to bring in `reqwest`
     // to perform HTTP requsts against our application.
@@ -34,7 +48,7 @@ async fn health_check_works() {
 
     // Act
     let response = client
-        .get(&format!("{}/health_check", &address))
+        .get(&format!("{}/health_check", &app.address))
         .send()
         .await
         .expect("Falied to execute reqwest.");
@@ -47,7 +61,7 @@ async fn health_check_works() {
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
-    let app_address = spawn_app();
+    let app = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration");
     let connection_string = configuration.database.connection_string();
     let connection = Database::connect(&connection_string)
@@ -62,7 +76,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     // Act
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
-        .post(&format!("{}/subscriptions", &app_address))
+        .post(&format!("{}/subscriptions", &app.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -84,7 +98,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
     // Arrange
-    let app_address = spawn_app();
+    let app = spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
@@ -95,7 +109,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     for (invalid_body, error_message) in test_cases {
         // Act
         let response = client
-            .post(&format!("{}/subscriptions", &app_address))
+            .post(&format!("{}/subscriptions", &app.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(invalid_body)
             .send()
