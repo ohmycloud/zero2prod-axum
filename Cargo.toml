@@ -17,6 +17,8 @@ members = [".", "entity", "migration"]
 axum = { version = "0.8.1", features = ["macros"] }
 chrono = { version = "0.4.39", default-features = false, features = ["clock"] }
 config = "0.15.6"
+env_logger = "0.11.6"
+log = "0.4.25"
 sea-orm-codegen = "1.1.4"
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
