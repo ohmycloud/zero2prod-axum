@@ -4,7 +4,7 @@ use axum::{
     routing::{IntoMakeService, get, post},
     serve::Serve,
 };
-use sea_orm::{DatabaseConnection, sqlx::PgConnection};
+use sea_orm::DatabaseConnection;
 use tokio::net::TcpListener;
 
 pub fn run(

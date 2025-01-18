@@ -1,1 +1,1 @@
-pub mod entitties;
+pub mod entities;
