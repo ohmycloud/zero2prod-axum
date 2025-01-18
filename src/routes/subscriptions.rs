@@ -35,13 +35,13 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 
     let request_id = Uuid::new_v4();
 
-    log::info!(
+    tracing::info!(
         "request_id {} - Adding '{}' '{}' as a new subscriber.",
         request_id,
         form.name,
         form.email
     );
-    log::info!(
+    tracing::info!(
         "request_id {} - Saving new subscriber details in the database",
         request_id
     );
@@ -50,14 +50,14 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         .await;
     match query {
         Ok(_) => {
-            log::info!(
+            tracing::info!(
                 "request_id {} - New subscriber details have been saved",
                 request_id
             );
             StatusCode::OK.into_response()
         }
         Err(e) => {
-            log::error!(
+            tracing::error!(
                 "request_id {} - Failed to execute query: {:?}",
                 request_id,
                 e

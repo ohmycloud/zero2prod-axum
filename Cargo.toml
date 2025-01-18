@@ -22,6 +22,7 @@ log = "0.4.25"
 sea-orm-codegen = "1.1.4"
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+tracing = { version = "0.1.41", features = ["log"] }
 uuid = { version = "1.12.0", features = ["v4"] }
 
 [dependencies.sea-orm]
