@@ -35,12 +35,17 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 
     let request_id = Uuid::new_v4();
 
-    tracing::info!(
-        "request_id {} - Adding '{}' '{}' as a new subscriber.",
-        request_id,
-        form.name,
-        form.email
+    // spans, like logs, have an associated level
+    // `info_span` creates a span at the info-level
+    let request_span = tracing::info_span!(
+        "Adding a new subscriber.",
+        request_id = %request_id,
+        subscriber_name = %form.name,
+        subscriber_email = %form.email
     );
+    // using `enter` in an async function is a recipe for disaster!
+    // bear with me for now, but don't do this at home.
+    let _request_span_guard = request_span.enter();
     tracing::info!(
         "request_id {} - Saving new subscriber details in the database",
         request_id
