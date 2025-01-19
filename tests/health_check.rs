@@ -3,6 +3,7 @@ use migration::{Migrator, MigratorTrait};
 use sea_orm::sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 use sea_orm::sqlx::{ConnectOptions, Connection};
 use sea_orm::{Database, DatabaseConnection, DbConn, EntityTrait};
+use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
@@ -43,7 +44,7 @@ async fn spawn_app() -> TestApp {
     let address = format!("http://127.0.0.1:{}", port);
     let configuration = get_configuration().expect("Failed to read configuration.");
     let connection_string = configuration.database.connection_string();
-    let db_connection = Database::connect(&connection_string)
+    let db_connection = Database::connect(&connection_string.expose_secret().to_owned())
         .await
         .expect("Failed to connect to Postgres.");
     let server = zero2prod::startup::run(listener, db_connection.clone())
@@ -88,7 +89,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let app = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration");
     let connection_string = configuration.database.connection_string();
-    let connection = Database::connect(&connection_string)
+    let connection = Database::connect(&connection_string.expose_secret().to_owned())
         .await
         .expect("Failed to connect to Postgres.");
     Migrator::up(&connection, None)

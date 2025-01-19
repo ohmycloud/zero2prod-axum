@@ -18,6 +18,7 @@ axum = { version = "0.8.1", features = ["macros"] }
 chrono = { version = "0.4.39", default-features = false, features = ["clock"] }
 config = "0.15.6"
 log = "0.4.25"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 tracing = { version = "0.1.41", features = ["log"] }
