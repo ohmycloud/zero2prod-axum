@@ -3,12 +3,16 @@ use std::net::TcpListener;
 use sea_orm::Database;
 use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_log::LogTracer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
 use zero2prod::{configuration::get_configuration, startup::run};
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    // redirect all `log`'s events to our subscriber
+    LogTracer::init().expect("Failed to set logger");
+
     // We are falling back to printing all logs at info-level or above
     // if the RUST_LOG environment variable has not been set.
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
