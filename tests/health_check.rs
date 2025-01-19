@@ -7,7 +7,7 @@ use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
-use zero2prod::configuration::get_configuration;
+use zero2prod::configuration::{DatabaseSettings, get_configuration};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -55,6 +55,16 @@ async fn spawn_app() -> TestApp {
         address,
         db_connection,
     }
+}
+
+pub async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
+    let connection_string = config
+        .connection_string_without_db()
+        .expose_secret()
+        .to_owned();
+    Database::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres")
 }
 
 // `tokio::test` is the testing equivalent of `tokio::main`.
