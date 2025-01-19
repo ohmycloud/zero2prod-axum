@@ -9,6 +9,7 @@ use entity::entities::prelude::*;
 use entity::entities::subscriptions;
 use sea_orm::{DatabaseConnection, EntityTrait, Set, prelude::DateTimeWithTimeZone};
 use serde::{Deserialize, Serialize};
+use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
@@ -46,27 +47,22 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
     // using `enter` in an async function is a recipe for disaster!
     // bear with me for now, but don't do this at home.
     let _request_span_guard = request_span.enter();
-    tracing::info!(
-        "request_id {} - Saving new subscriber details in the database",
-        request_id
-    );
+
+    // We do not call `.enter` on query_span!
+    // `.instrument` takes care of it at the right moments
+    // in the query future lifetime
+    let query_span = tracing::info_span!("Saving new subscriber details in the database");
     let query = Subscriptions::insert(subscription)
         .exec(&state.db_connection)
+        // First we attach the instrumentation, then we `.await` it
+        .instrument(query_span)
         .await;
     match query {
-        Ok(_) => {
-            tracing::info!(
-                "request_id {} - New subscriber details have been saved",
-                request_id
-            );
-            StatusCode::OK.into_response()
-        }
+        Ok(_) => StatusCode::OK.into_response(),
         Err(e) => {
-            tracing::error!(
-                "request_id {} - Failed to execute query: {:?}",
-                request_id,
-                e
-            );
+            // Yes, this error log falls outside of `query_span`
+            // We'll rectify it later, pinky swear!
+            tracing::error!("Failed to execute query: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
