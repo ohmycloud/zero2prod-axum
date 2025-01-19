@@ -1,16 +1,12 @@
 use crate::routes::{AppState, health_check::*, subscribe};
 use axum::{
     Router,
-    body::Body,
-    http::Request,
     routing::{IntoMakeService, get, post},
     serve::Serve,
 };
+use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::DatabaseConnection;
 use tokio::net::TcpListener;
-use tower_http::trace::TraceLayer;
-use tower_request_id::{RequestId, RequestIdLayer};
-use tracing::info_span;
 
 pub fn run(
     listener: std::net::TcpListener,
@@ -20,24 +16,8 @@ pub fn run(
         db_connection: connection,
     };
     let app = Router::new()
-        .layer(
-            TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-                // We get the request id from the extensions
-                let request_id = request
-                    .extensions()
-                    .get::<RequestId>()
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "unknown".into());
-                // And then we put it along with other information into the `request` span
-                info_span!(
-                    "request",
-                    id = %request_id,
-                    method = %request.method(),
-                    uri = %request.uri(),
-                )
-            }),
-        )
-        .layer(RequestIdLayer)
+        //start OpenTelemetry trace on incoming request
+        .layer(OtelAxumLayer::default())
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/", get(index))
