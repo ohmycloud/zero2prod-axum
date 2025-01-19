@@ -45,7 +45,10 @@ pub fn run(
         .with_state(app_state.clone());
 
     let listener = TcpListener::from_std(listener)?;
-    println!("Listening on {:?}", listener.local_addr());
+    println!(
+        "Listening on http://{:?}",
+        listener.local_addr().expect("network error")
+    );
 
     let server = axum::serve(listener, app.into_make_service());
     Ok(server)
