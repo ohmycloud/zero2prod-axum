@@ -4,7 +4,15 @@ use sea_orm::sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 use sea_orm::sqlx::{ConnectOptions, Connection};
 use sea_orm::{Database, DatabaseConnection, DbConn, EntityTrait};
 use std::net::TcpListener;
+use std::sync::LazyLock;
+use uuid::Uuid;
 use zero2prod::configuration::get_configuration;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
+
+static TRACING: LazyLock<()> = LazyLock::new(|| {
+    let subscriber = get_subscriber("test".into(), "debug".into());
+    init_subscriber(subscriber);
+});
 
 pub struct TestApp {
     pub address: String,
@@ -13,6 +21,10 @@ pub struct TestApp {
 
 // Launch our application in the background
 async fn spawn_app() -> TestApp {
+    // The first time `initialize` is invoked the code in `TRACING` is executed.
+    // All other invocations will instead skip execution.
+    LazyLock::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     listener.set_nonblocking(true).unwrap();
     let port = listener.local_addr().unwrap().port();
