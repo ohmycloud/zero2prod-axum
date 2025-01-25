@@ -35,3 +35,9 @@ services:
     # All incoming requests should be routed to our app
     routes:
       - path: /
+databases:
+  - engine: PG
+    name: newsletter
+    num_nodes: 1
+    size: db-s-dev-database
+    version: "12"
