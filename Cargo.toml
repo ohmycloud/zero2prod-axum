@@ -21,6 +21,7 @@ config = "0.15.6"
 log = "0.4.25"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.217", features = ["derive"] }
+serde-aux = "4.5.0"
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = ["trace"] }

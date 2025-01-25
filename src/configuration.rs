@@ -1,4 +1,5 @@
 use secrecy::{ExposeSecret, SecretString};
+use serde_aux::field_attributes::deserialize_number_from_string;
 
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct Settings {
@@ -8,6 +9,7 @@ pub struct Settings {
 
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -16,6 +18,7 @@ pub struct ApplicationSettings {
 pub struct DatabaseSettings {
     pub username: String,
     pub password: SecretString,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
     pub database_name: String,
