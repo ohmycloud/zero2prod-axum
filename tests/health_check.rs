@@ -1,8 +1,8 @@
 use entity::entities::prelude::*;
 use migration::{Migrator, MigratorTrait};
-use sea_orm::sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
+use sea_orm::sqlx::postgres::{PgConnectOptions, PgConnection, PgPoolOptions, PgSslMode};
 use sea_orm::sqlx::{ConnectOptions, Connection};
-use sea_orm::{Database, DatabaseConnection, DbConn, EntityTrait};
+use sea_orm::{Database, DatabaseConnection, DbConn, EntityTrait, SqlxPostgresConnector};
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use std::sync::LazyLock;
@@ -43,10 +43,8 @@ async fn spawn_app() -> TestApp {
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
     let configuration = get_configuration().expect("Failed to read configuration.");
-    let connection_string = configuration.database.connection_string();
-    let db_connection = Database::connect(&connection_string.expose_secret().to_owned())
-        .await
-        .expect("Failed to connect to Postgres.");
+    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
+    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
     let server = zero2prod::startup::run(listener, db_connection.clone())
         .expect("Failed to bind address")
         .into_future();
@@ -58,13 +56,8 @@ async fn spawn_app() -> TestApp {
 }
 
 pub async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
-    let connection_string = config
-        .connection_string_without_db()
-        .expose_secret()
-        .to_owned();
-    Database::connect(&connection_string)
-        .await
-        .expect("Failed to connect to Postgres")
+    let db_pool = PgPoolOptions::new().connect_lazy_with(config.with_db());
+    SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool)
 }
 
 // `tokio::test` is the testing equivalent of `tokio::main`.
@@ -98,11 +91,10 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_string = configuration.database.connection_string();
-    let connection = Database::connect(&connection_string.expose_secret().to_owned())
-        .await
-        .expect("Failed to connect to Postgres.");
-    Migrator::up(&connection, None)
+    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
+    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
+
+    Migrator::up(&db_connection, None)
         .await
         .expect("Failed to run migrations for tests");
 
@@ -122,7 +114,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(200, response.status().as_u16());
 
     let saved = Subscriptions::find()
-        .one(&connection)
+        .one(&db_connection)
         .await
         .expect("Failed to fetch data.")
         .expect("No data received.");

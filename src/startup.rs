@@ -10,11 +10,9 @@ use tokio::net::TcpListener;
 
 pub fn run(
     listener: std::net::TcpListener,
-    connection: DatabaseConnection,
+    db_connection: DatabaseConnection,
 ) -> Result<Serve<TcpListener, IntoMakeService<Router>, Router>, std::io::Error> {
-    let app_state = AppState {
-        db_connection: connection,
-    };
+    let app_state = AppState { db_connection };
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())

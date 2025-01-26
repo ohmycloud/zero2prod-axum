@@ -1,7 +1,6 @@
 use std::net::TcpListener;
 
-use sea_orm::Database;
-use secrecy::ExposeSecret;
+use sea_orm::{SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
 use zero2prod::{
     configuration::get_configuration,
     startup::run,
@@ -23,9 +22,8 @@ async fn main() -> Result<(), std::io::Error> {
     let _ = listener.set_nonblocking(true);
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_string = configuration.database.connection_string();
-    let connection = Database::connect(&connection_string.expose_secret().to_owned())
-        .await
-        .expect("Failed to connect to Postgres.");
-    run(listener, connection)?.await
+    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
+    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
+
+    run(listener, db_connection)?.await
 }
