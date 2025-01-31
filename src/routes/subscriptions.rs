@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
+use crate::domain::{NewSubscriber, SubscriberName};
+
 #[derive(Serialize, Deserialize)]
 pub struct FormData {
     pub name: String,
@@ -33,7 +35,12 @@ pub struct AppState {
     )
 )]
 pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
-    match insert_subscriber(&state, &form).await {
+    let new_subscriber = NewSubscriber {
+        email: form.email,
+        name: SubscriberName::parse(form.name),
+    };
+
+    match insert_subscriber(&state, &new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -41,14 +48,17 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(state, form)
+    skip(state, new_subscriber)
 )]
-pub async fn insert_subscriber(state: &AppState, form: &FormData) -> Result<(), sea_orm::DbErr> {
+pub async fn insert_subscriber(
+    state: &AppState,
+    new_subscriber: &NewSubscriber,
+) -> Result<(), sea_orm::DbErr> {
     let subscriber_id = Uuid::new_v4();
     let subscription = subscriptions::ActiveModel {
         id: Set(subscriber_id),
-        name: Set(form.name.clone()),
-        email: Set(form.email.clone()),
+        name: Set(new_subscriber.name.as_ref().to_string()),
+        email: Set(new_subscriber.email.clone()),
         subscribed_at: Set(DateTimeWithTimeZone::from(Utc::now())),
         status: Set("confirmed".to_string()),
     };
