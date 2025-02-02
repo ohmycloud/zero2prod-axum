@@ -35,9 +35,14 @@ pub struct AppState {
     )
 )]
 pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
+    let name = match SubscriberName::parse(form.name) {
+        Ok(name) => name,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
     let new_subscriber = NewSubscriber {
         email: form.email,
-        name: SubscriberName::parse(form.name).expect("Name validation failed."),
+        name,
     };
 
     match insert_subscriber(&state, &new_subscriber).await {
