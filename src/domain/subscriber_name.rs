@@ -3,12 +3,6 @@ use unicode_segmentation::UnicodeSegmentation;
 #[derive(Debug)]
 pub struct SubscriberName(String);
 
-#[derive(Debug)]
-pub struct NewSubscriber {
-    pub email: String,
-    pub name: SubscriberName,
-}
-
 impl AsRef<str> for SubscriberName {
     fn as_ref(&self) -> &str {
         &self.0
