@@ -44,9 +44,8 @@ mod tests {
         assert_err!(SubscriberEmail::parse(email));
     }
 
-    #[test]
-    fn valid_emails_are_parsed_successfully() {
-        let email = SafeEmail().fake();
-        claims::assert_ok!(SubscriberEmail::parse(email));
+    #[quickcheck_macros::quickcheck]
+    fn valid_emails_are_parsed_successfully(valid_email: String) -> bool {
+        SubscriberEmail::parse(valid_email).is_ok()
     }
 }
