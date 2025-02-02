@@ -17,6 +17,7 @@ members = [".", "entity", "migration"]
 axum = { version = "0.8.1", features = ["macros"] }
 axum-tracing-opentelemetry = "0.25.0"
 chrono = { version = "0.4.39", default-features = false, features = ["clock"] }
+claims = "0.8.0"
 config = "0.15.6"
 log = "0.4.25"
 secrecy = { version = "0.10.3", features = ["serde"] }
