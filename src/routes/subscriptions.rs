@@ -37,7 +37,7 @@ pub struct AppState {
 pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
     let new_subscriber = NewSubscriber {
         email: form.email,
-        name: SubscriberName::parse(form.name),
+        name: SubscriberName::parse(form.name).expect("Name validation failed."),
     };
 
     match insert_subscriber(&state, &new_subscriber).await {
