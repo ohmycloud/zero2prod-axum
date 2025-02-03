@@ -24,7 +24,19 @@ mod tests {
     use super::SubscriberEmail;
     use claims::assert_err;
     use fake::Fake;
-    use fake::faker::internet::en::SafeEmail;
+    use fake::faker::internet::raw::SafeEmail;
+    use fake::locales::EN;
+    use quickcheck::{Arbitrary, Gen};
+
+    #[derive(Debug, Clone)]
+    struct ValidEmailFixture(pub String);
+
+    impl Arbitrary for ValidEmailFixture {
+        fn arbitrary(g: &mut Gen) -> Self {
+            let email = SafeEmail(EN).fake_with_rng(g);
+            Self(email)
+        }
+    }
 
     #[test]
     fn empty_string_is_rejected() {
