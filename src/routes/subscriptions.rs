@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberName};
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 
 #[derive(Serialize, Deserialize)]
 pub struct FormData {
@@ -40,10 +40,12 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    let new_subscriber = NewSubscriber {
-        email: form.email,
-        name,
+    let email = match SubscriberEmail::parse(form.email) {
+        Ok(email) => email,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
+
+    let new_subscriber = NewSubscriber { email, name };
 
     match insert_subscriber(&state, &new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
@@ -63,7 +65,7 @@ pub async fn insert_subscriber(
     let subscription = subscriptions::ActiveModel {
         id: Set(subscriber_id),
         name: Set(new_subscriber.name.as_ref().to_string()),
-        email: Set(new_subscriber.email.clone()),
+        email: Set(new_subscriber.email.as_ref().to_string()),
         subscribed_at: Set(DateTimeWithTimeZone::from(Utc::now())),
         status: Set("confirmed".to_string()),
     };
