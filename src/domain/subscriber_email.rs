@@ -27,13 +27,15 @@ mod tests {
     use fake::faker::internet::raw::SafeEmail;
     use fake::locales::EN;
     use quickcheck::{Arbitrary, Gen};
+    use rand::{SeedableRng, prelude::StdRng};
 
     #[derive(Debug, Clone)]
     struct ValidEmailFixture(pub String);
 
     impl Arbitrary for ValidEmailFixture {
         fn arbitrary(g: &mut Gen) -> Self {
-            let email = SafeEmail(EN).fake_with_rng(g);
+            let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
+            let email = SafeEmail(EN).fake_with_rng(&mut rng);
             Self(email)
         }
     }
