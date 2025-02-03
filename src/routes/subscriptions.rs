@@ -25,6 +25,16 @@ pub struct AppState {
     pub db_connection: DatabaseConnection,
 }
 
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(form: FormData) -> Result<Self, Self::Error> {
+        let name = SubscriberName::parse(form.name)?;
+        let email = SubscriberEmail::parse(form.email)?;
+        Ok(Self { email, name })
+    }
+}
+
 pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
     let name = SubscriberName::parse(form.name)?;
     let email = SubscriberEmail::parse(form.email)?;
@@ -41,7 +51,7 @@ pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
     )
 )]
 pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
-    let new_subscriber = match parse_subscriber(form) {
+    let new_subscriber = match form.try_into() {
         Ok(subscriber) => subscriber,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
