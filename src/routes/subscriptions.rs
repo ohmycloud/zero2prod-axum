@@ -25,6 +25,12 @@ pub struct AppState {
     pub db_connection: DatabaseConnection,
 }
 
+pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
+    let name = SubscriberName::parse(form.name)?;
+    let email = SubscriberEmail::parse(form.email)?;
+    Ok(NewSubscriber { email, name })
+}
+
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(state, form),
@@ -35,17 +41,10 @@ pub struct AppState {
     )
 )]
 pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
-    let name = match SubscriberName::parse(form.name) {
-        Ok(name) => name,
+    let new_subscriber = match parse_subscriber(form) {
+        Ok(subscriber) => subscriber,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
-
-    let email = match SubscriberEmail::parse(form.email) {
-        Ok(email) => email,
-        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    let new_subscriber = NewSubscriber { email, name };
 
     match insert_subscriber(&state, &new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
