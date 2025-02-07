@@ -4,7 +4,8 @@ use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{DatabaseConnection, EntityTrait, SqlxPostgresConnector};
 use std::net::TcpListener;
 use std::sync::LazyLock;
-use zero2prod::configuration::{DatabaseSettings, get_configuration};
+use zero2prod::configuration::{self, DatabaseSettings, get_configuration};
+use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -42,7 +43,12 @@ async fn spawn_app() -> TestApp {
     let configuration = get_configuration().expect("Failed to read configuration.");
     let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
     let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
-    let server = zero2prod::startup::run(listener, db_connection.clone())
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+    let server = zero2prod::startup::run(listener, db_connection.clone(), email_client)
         .expect("Failed to bind address")
         .into_future();
     let _ = tokio::spawn(server);

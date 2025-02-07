@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use crate::{
+    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    email_client::EmailClient,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct FormData {
@@ -23,6 +26,7 @@ pub struct FormData {
 #[derive(Clone)]
 pub struct AppState {
     pub db_connection: DatabaseConnection,
+    pub email_client: EmailClient,
 }
 
 impl TryFrom<FormData> for NewSubscriber {

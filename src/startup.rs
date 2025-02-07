@@ -1,4 +1,7 @@
-use crate::routes::{AppState, health_check::*, subscribe};
+use crate::{
+    email_client::EmailClient,
+    routes::{AppState, health_check::*, subscribe},
+};
 use axum::{
     Router,
     routing::{IntoMakeService, get, post},
@@ -11,8 +14,12 @@ use tokio::net::TcpListener;
 pub fn run(
     listener: std::net::TcpListener,
     db_connection: DatabaseConnection,
+    email_client: EmailClient,
 ) -> Result<Serve<TcpListener, IntoMakeService<Router>, Router>, std::io::Error> {
-    let app_state = AppState { db_connection };
+    let app_state = AppState {
+        db_connection,
+        email_client,
+    };
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
