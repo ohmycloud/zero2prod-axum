@@ -39,7 +39,7 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), String> {
+    ) -> Result<(), reqwest::Error> {
         // You can do better using `reqwest::Url::join` if you change
         // `base_url`'s type from `String` to `request::Url`.
         let url = format!("{}/email", self.base_url);
@@ -58,7 +58,9 @@ impl EmailClient {
                 "X-Postmark-Server-Token",
                 self.authorization_token.expose_secret(),
             )
-            .json(&request_body);
+            .json(&request_body)
+            .send()
+            .await?;
         Ok(())
     }
 }
