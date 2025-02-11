@@ -72,7 +72,10 @@ mod tests {
     use fake::faker::lorem::en::Sentence;
     use fake::{Fake, Faker};
     use secrecy::SecretString;
-    use wiremock::matchers::any;
+    use wiremock::matchers::header;
+    use wiremock::matchers::header_exists;
+    use wiremock::matchers::method;
+    use wiremock::matchers::path;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::domain::SubscriberEmail;
@@ -89,7 +92,10 @@ mod tests {
             SecretString::from(Faker.fake::<String>()),
         );
 
-        Mock::given(any())
+        Mock::given(header_exists("X-Postmark-Server-Token"))
+            .and(header("Content-Type", "application/json"))
+            .and(path("/email"))
+            .and(method("POST"))
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
             .mount(&mock_server)
