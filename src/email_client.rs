@@ -1,6 +1,15 @@
 use crate::domain::SubscriberEmail;
 use reqwest::Client;
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct SendEmailRequest {
+    from: String,
+    to: String,
+    subject: String,
+    html_body: String,
+    text_body: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct EmailClient {
     http_client: Client,
@@ -27,7 +36,15 @@ impl EmailClient {
         // You can do better using `reqwest::Url::join` if you change
         // `base_url`'s type from `String` to `request::Url`.
         let url = format!("{}/email", self.base_url);
-        let builder = self.http_client.post(&url);
+        let request_body = SendEmailRequest {
+            from: self.sender.as_ref().to_owned(),
+            to: recipient.as_ref().to_owned(),
+            subject: subject.to_owned(),
+            html_body: html_content.to_owned(),
+            text_body: text_content.to_owned(),
+        };
+
+        let builder = self.http_client.post(&url).json(&request_body);
         Ok(())
     }
 }
