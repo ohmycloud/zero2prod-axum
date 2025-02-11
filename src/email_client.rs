@@ -3,6 +3,7 @@ use reqwest::Client;
 use secrecy::{ExposeSecret, SecretString};
 
 #[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "PascalCase")]
 struct SendEmailRequest {
     from: String,
     to: String,
