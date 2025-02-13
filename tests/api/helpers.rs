@@ -3,7 +3,7 @@ use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
-use zero2prod::email_client::EmailClient;
+use zero2prod::startup::{build, get_db_connection};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -39,26 +39,15 @@ pub async fn spawn_app() -> TestApp {
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
     let configuration = get_configuration().expect("Failed to read configuration.");
-    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
-    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sender email address.");
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-        timeout,
-    );
-    let server = zero2prod::startup::run(listener, db_connection.clone(), email_client)
-        .expect("Failed to bind address")
+
+    let server = build(configuration.clone())
+        .await
+        .expect("Failed to build application.")
         .into_future();
     let _ = tokio::spawn(server);
     TestApp {
         address,
-        db_connection,
+        db_connection: get_db_connection(&configuration.database),
     }
 }
 
