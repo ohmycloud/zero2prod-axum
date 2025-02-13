@@ -1,5 +1,5 @@
 use crate::{
-    configuration::{Settings, get_configuration},
+    configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
     routes::{AppState, health_check::*, subscribe},
 };
@@ -51,8 +51,7 @@ pub async fn build(
     let _ = listener.set_nonblocking(true);
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
-    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
+    let db_connection = get_db_connection(&configuration.database);
 
     let sender_email = configuration
         .email_client
@@ -67,4 +66,9 @@ pub async fn build(
     );
 
     run(listener, db_connection, email_client)
+}
+
+pub fn get_db_connection(configuration: &DatabaseSettings) -> DatabaseConnection {
+    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.with_db());
+    SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool)
 }
