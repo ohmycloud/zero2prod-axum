@@ -2,8 +2,10 @@ use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
 use std::net::TcpListener;
 use std::sync::LazyLock;
+use uuid::Uuid;
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
-use zero2prod::startup::{build, get_db_connection};
+use zero2prod::startup::Application;
+use zero2prod::startup::get_db_connection;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -36,15 +38,28 @@ pub async fn spawn_app() -> TestApp {
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     listener.set_nonblocking(true).unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
-    let configuration = get_configuration().expect("Failed to read configuration.");
 
-    let server = build(configuration.clone())
+    let configuration = {
+        let mut c = get_configuration().expect("Failed to read configuration.");
+        // Use a different database for each test case
+        c.database.database_name = Uuid::new_v4().to_string();
+        // Use a random OS port
+        c.application.port = 0;
+        c
+    };
+
+    // Create and migrate the database
+    configure_database(&configuration.database).await;
+
+    let application = Application::build(configuration.clone())
         .await
-        .expect("Failed to build application.")
-        .into_future();
-    let _ = tokio::spawn(server);
+        .expect("Failed to build application.");
+
+    // Got the port before spawning the application
+    let address = format!("http://127.0.0.1:{}", application.port());
+
+    let _ = tokio::spawn(application.run_until_stopped());
+
     TestApp {
         address,
         db_connection: get_db_connection(&configuration.database),
