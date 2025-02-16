@@ -55,7 +55,7 @@ impl EmailClient {
             text_body: text_content,
         };
 
-        let builder = self
+        let _ = self
             .http_client
             .post(&url)
             .header(
