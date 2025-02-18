@@ -15,6 +15,7 @@ impl MigrationTrait for Migration {
                     .col(text_uniq(Subscriptions::Email))
                     .col(text(Subscriptions::Name))
                     .col(timestamp_with_time_zone(Subscriptions::SubscribedAt))
+                    .col(text(Subscriptions::Status))
                     .to_owned(),
             )
             .await
@@ -34,4 +35,5 @@ pub(crate) enum Subscriptions {
     Email,
     Name,
     SubscribedAt,
+    Status,
 }
