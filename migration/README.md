@@ -39,3 +39,12 @@
     ```sh
     cargo run -- status
     ```
+
+# 操作步骤
+
+- migration
+
+```bash
+cargo run -- generate create_table
+cargo run -- generate create_subscription_tokens
+```
