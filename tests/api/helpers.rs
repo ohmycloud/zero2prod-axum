@@ -3,6 +3,7 @@ use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::configuration::{DatabaseSettings, get_configuration};
 use zero2prod::startup::Application;
 use zero2prod::startup::get_db_connection;
@@ -28,6 +29,7 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 pub struct TestApp {
     pub address: String,
     pub db_connection: DatabaseConnection,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -51,12 +53,17 @@ pub async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     listener.set_nonblocking(true).unwrap();
 
+    // Launch a mock server to stand in for Postmark's API
+    let email_server = MockServer::start().await;
+
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration.");
         // Use a different database for each test case
         c.database.database_name = Uuid::new_v4().to_string();
         // Use a random OS port
         c.application.port = 0;
+        // Use the mock server as email API
+        c.email_client.base_url = email_server.uri();
         c
     };
 
@@ -75,6 +82,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_connection: get_db_connection(&configuration.database),
+        email_server,
     }
 }
 

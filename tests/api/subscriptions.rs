@@ -1,6 +1,8 @@
 use entity::entities::prelude::*;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{EntityTrait, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
 use zero2prod::configuration::get_configuration;
 
 use crate::helpers::spawn_app;
@@ -80,4 +82,24 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
             description
         );
     }
+}
+
+#[tokio::test]
+async fn subscribe_sends_a_configuration_email_for_valid_data() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    // Act
+    let _ = app.post_subscriptions(body.into()).await;
+
+    // Assert
+    // Mock asserts on drop
 }

@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::EmailClient,
+    email_client::{self, EmailClient},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -60,10 +60,27 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    match insert_subscriber(&state, &new_subscriber).await {
-        Ok(_) => StatusCode::OK.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    if insert_subscriber(&state, &new_subscriber).await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    // Send a (useless) email to the new subscriber.
+    // We are ignoring email delivery errors for now.
+    if state
+        .email_client
+        .send_email(
+            new_subscriber.email,
+            "Welcome!",
+            "Welcome to our newsletter!",
+            "Welcome to our newsletter!",
+        )
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    StatusCode::OK.into_response()
 }
 
 #[tracing::instrument(
