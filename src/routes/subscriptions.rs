@@ -90,7 +90,7 @@ pub async fn insert_subscriber(
         name: Set(new_subscriber.name.as_ref().to_string()),
         email: Set(new_subscriber.email.as_ref().to_string()),
         subscribed_at: Set(DateTimeWithTimeZone::from(Utc::now())),
-        status: Set("confirmed".to_string()),
+        status: Set("pending_confirmation".to_string()),
     };
 
     Subscriptions::insert(subscription)

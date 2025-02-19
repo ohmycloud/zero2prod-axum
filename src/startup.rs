@@ -1,7 +1,7 @@
 use crate::{
     configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
-    routes::{AppState, health_check::*, subscribe},
+    routes::{AppState, confirm, health_check::*, subscribe},
 };
 use axum::{
     Router,
@@ -72,6 +72,7 @@ pub fn run(
         .layer(OtelAxumLayer::default())
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
+        .route("/subscriptions/confirm", post(confirm))
         .route("/", get(index))
         .route("/{name}", get(greet))
         .with_state(app_state.clone());
