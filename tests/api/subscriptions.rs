@@ -11,16 +11,7 @@ use crate::helpers::spawn_app;
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app = spawn_app().await;
-    let configuration = get_configuration().expect("Failed to read configuration");
-    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
-    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
-
-    Migrator::up(&db_connection, None)
-        .await
-        .expect("Failed to run migrations for tests");
-
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
@@ -32,7 +23,31 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     // Assert
     assert_eq!(200, response.status().as_u16());
+}
 
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // Act
+    app.post_subscriptions(body.into()).await;
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
+    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
+
+    Migrator::up(&db_connection, None)
+        .await
+        .expect("Failed to run migrations for tests");
+
+    // Assert
     let saved = Subscriptions::find()
         .one(&db_connection)
         .await
@@ -40,6 +55,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .expect("No data received.");
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, "pending_confirmation");
 }
 
 #[tokio::test]
