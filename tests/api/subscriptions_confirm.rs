@@ -21,7 +21,7 @@ async fn confirmations_without_token_are_rejected_a_400() {
 async fn the_link_returned_by_subsribe_returns_a_200_if_called() {
     // Arrange
     let app = spawn_app().await;
-    let body = "name=le%20guin%email=ursula_let_guin%40gmail.com";
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -30,6 +30,7 @@ async fn the_link_returned_by_subsribe_returns_a_200_if_called() {
         .await;
 
     app.post_subscriptions(body.into()).await;
+
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
 
@@ -43,10 +44,11 @@ async fn the_link_returned_by_subsribe_returns_a_200_if_called() {
         links[0].as_str().to_owned()
     };
     let raw_confirmation_link = &get_link(&body["HtmlBody"].as_str().unwrap());
-    let confirmation_link = Url::parse(raw_confirmation_link).unwrap();
+    let mut confirmation_link = Url::parse(raw_confirmation_link).unwrap();
 
     // Let's make sure we don't call random APIs on the web
     assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
+    confirmation_link.set_port(Some(app.port)).unwrap();
 
     // Act
     let response = reqwest::get(confirmation_link).await.unwrap();
