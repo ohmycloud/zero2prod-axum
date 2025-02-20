@@ -42,7 +42,12 @@ impl Application {
         listener.set_nonblocking(true).unwrap();
 
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, db_connection, email_client)?;
+        let server = run(
+            listener,
+            db_connection,
+            email_client,
+            configuration.application.base_url,
+        )?;
 
         Ok(Self { port, server })
     }
@@ -62,10 +67,12 @@ pub fn run(
     listener: std::net::TcpListener,
     db_connection: DatabaseConnection,
     email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server, std::io::Error> {
     let app_state = AppState {
         db_connection,
         email_client,
+        base_url,
     };
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
@@ -110,7 +117,12 @@ pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
         timeout,
     );
 
-    run(listener, db_connection, email_client)
+    run(
+        listener,
+        db_connection,
+        email_client,
+        configuration.application.base_url,
+    )
 }
 
 pub fn get_db_connection(configuration: &DatabaseSettings) -> DatabaseConnection {

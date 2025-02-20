@@ -27,6 +27,7 @@ pub struct FormData {
 pub struct AppState {
     pub db_connection: DatabaseConnection,
     pub email_client: EmailClient,
+    pub base_url: String,
 }
 
 impl TryFrom<FormData> for NewSubscriber {
@@ -66,7 +67,7 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
-    if send_confirmation_email(state.email_client, new_subscriber)
+    if send_confirmation_email(state.email_client, new_subscriber, state.base_url)
         .await
         .is_err()
     {
@@ -105,13 +106,14 @@ pub async fn insert_subscriber(
 
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
-    skip(email_client, new_subscriber)
+    skip(email_client, new_subscriber, base_url)
 )]
 pub async fn send_confirmation_email(
     email_client: EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: String,
 ) -> Result<(), reqwest::Error> {
-    let confirmation_link = "https://there-is0no-such-domain.com/subscriptions/confirm";
+    let confirmation_link = format!("{}/subscriptions/confirm", base_url);
     let palin_body = format!(
         "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
         confirmation_link
