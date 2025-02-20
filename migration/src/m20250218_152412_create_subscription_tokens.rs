@@ -18,14 +18,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(uuid(SubscriptionTokens::SubscriptionId).not_null())
+                    .col(uuid(SubscriptionTokens::SubscriberId).not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_subscription_id")
-                            .from(
-                                SubscriptionTokens::Table,
-                                SubscriptionTokens::SubscriptionId,
-                            )
+                            .from(SubscriptionTokens::Table, SubscriptionTokens::SubscriberId)
                             .to(Subscriptions::Table, Subscriptions::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -45,5 +42,5 @@ impl MigrationTrait for Migration {
 pub enum SubscriptionTokens {
     Table,
     SubscriptionToken,
-    SubscriptionId,
+    SubscriberId,
 }

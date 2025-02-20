@@ -5,8 +5,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
-use entity::entities::prelude::*;
 use entity::entities::subscriptions;
+use entity::entities::{prelude::*, subscription_tokens};
+use rand::distributions::Alphanumeric;
+use rand::{Rng, thread_rng};
 use sea_orm::{DatabaseConnection, EntityTrait, Set, prelude::DateTimeWithTimeZone};
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
@@ -61,15 +63,28 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    if insert_subscriber(&state, &new_subscriber).await.is_err() {
+    let subscriber_id = match insert_subscriber(&state, &new_subscriber).await {
+        Ok(subscriber_id) => subscriber_id,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+    let subscription_token = generate_subscription_token();
+    if store_token(&state, &subscription_token, subscriber_id)
+        .await
+        .is_err()
+    {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
-    if send_confirmation_email(state.email_client, new_subscriber, state.base_url)
-        .await
-        .is_err()
+    if send_confirmation_email(
+        state.email_client,
+        new_subscriber,
+        state.base_url,
+        "mytoken",
+    )
+    .await
+    .is_err()
     {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
@@ -84,7 +99,7 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 pub async fn insert_subscriber(
     state: &AppState,
     new_subscriber: &NewSubscriber,
-) -> Result<(), sea_orm::DbErr> {
+) -> Result<Uuid, sea_orm::DbErr> {
     let subscriber_id = Uuid::new_v4();
     let subscription = subscriptions::ActiveModel {
         id: Set(subscriber_id),
@@ -102,21 +117,22 @@ pub async fn insert_subscriber(
             e
         })?;
 
-    Ok(())
+    Ok(subscriber_id)
 }
 
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
-    skip(email_client, new_subscriber, base_url)
+    skip(email_client, new_subscriber, base_url, subscription_token)
 )]
 pub async fn send_confirmation_email(
     email_client: EmailClient,
     new_subscriber: NewSubscriber,
     base_url: String,
+    subscription_token: &str,
 ) -> Result<(), reqwest::Error> {
     let confirmation_link = format!(
-        "{}/subscriptions/confirm?subscription_token=mytoten",
-        base_url
+        "{}/subscriptions/confirm?subscription_token={}",
+        base_url, subscription_token
     );
     let palin_body = format!(
         "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
@@ -130,6 +146,30 @@ pub async fn send_confirmation_email(
     email_client
         .send_email(new_subscriber.email, "Welcome!", &html_body, &palin_body)
         .await
+}
+
+#[tracing::instrument(
+    name = "Storing subscription token in the database",
+    skip(state, subscriber_id, subscription_token)
+)]
+pub async fn store_token(
+    state: &AppState,
+    subscription_token: &str,
+    subscriber_id: Uuid,
+) -> Result<(), sea_orm::DbErr> {
+    let token = subscription_tokens::ActiveModel {
+        subscription_token: Set(subscription_token.to_string()),
+        subscriber_id: Set(subscriber_id),
+    };
+    SubscriptionTokens::insert(token)
+        .exec(&state.db_connection)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+
+    Ok(())
 }
 
 /// Returns `true` if the input satisfies all our validation constraints
@@ -154,4 +194,13 @@ pub fn is_valid_name(s: &str) -> bool {
 
     // Return `false` if any of our conditions have been violated
     !(is_empty_or_whitespace | is_too_long || contains_forbidden_characters)
+}
+
+/// Generate a random 25-characters-long case-sensitive subscription token.
+pub fn generate_subscription_token() -> String {
+    let mut rng = thread_rng();
+    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(25)
+        .collect()
 }

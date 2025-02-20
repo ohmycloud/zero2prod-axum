@@ -45,6 +45,8 @@
 - migration
 
 ```bash
+cd migration
 cargo run -- generate create_table
 cargo run -- generate create_subscription_tokens
+sea-orm-cli generate entity -o entity/src/entities
 ```

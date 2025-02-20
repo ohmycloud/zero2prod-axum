@@ -20,6 +20,7 @@ chrono = { version = "0.4.39", default-features = false, features = ["clock"] }
 claims = "0.8.0"
 config = "0.15.6"
 log = "0.4.25"
+rand = { version = "0.8.5", features = ["std_rng"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde-aux = "4.5.0"
