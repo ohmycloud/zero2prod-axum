@@ -38,10 +38,12 @@ impl Application {
             "{}:{}",
             configuration.application.host, configuration.application.port
         );
+
         let listener = std::net::TcpListener::bind(address)?;
         listener.set_nonblocking(true).unwrap();
 
         let port = listener.local_addr().unwrap().port();
+
         let server = run(
             listener,
             db_connection,

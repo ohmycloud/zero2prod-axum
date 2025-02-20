@@ -101,6 +101,7 @@ pub async fn insert_subscriber(
             tracing::error!("Failed to execute query: {:?}", e);
             e
         })?;
+
     Ok(())
 }
 

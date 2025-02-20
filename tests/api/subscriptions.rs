@@ -12,6 +12,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
@@ -37,7 +38,8 @@ async fn subscribe_persists_the_new_subscriber() {
         .await;
 
     // Act
-    app.post_subscriptions(body.into()).await;
+    let response = app.post_subscriptions(body.into()).await;
+    assert_eq!(200, response.status().as_u16());
 
     let configuration = get_configuration().expect("Failed to read configuration");
     let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
