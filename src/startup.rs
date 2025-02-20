@@ -81,7 +81,7 @@ pub fn run(
         .layer(OtelAxumLayer::default())
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .route("/subscriptions/confirm", post(confirm))
+        .route("/subscriptions/confirm", get(confirm))
         .route("/", get(index))
         .route("/{name}", get(greet))
         .with_state(app_state.clone());
