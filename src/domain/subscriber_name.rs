@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn empty_string_is_rejected() {
         let name = "".to_string();
-        assert_ok!(SubscriberName::parse(name));
+        assert_err!(SubscriberName::parse(name));
     }
 
     #[test]
