@@ -22,19 +22,28 @@ use crate::{
     email_client::EmailClient,
 };
 
-#[derive(Debug)]
 pub enum SubscribeError {
     ValidationError(String),
-    DatabaseError(sea_orm::DbErr),
+    PoolError(sea_orm::DbErr),
+    InsertSubscriberError(sea_orm::DbErr),
+    TransactionCommitError(sea_orm::DbErr),
     StoreTokenError(StoreTokenError),
     SendEmailError(reqwest::Error),
+}
+
+impl std::fmt::Debug for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
 }
 
 impl IntoResponse for SubscribeError {
     fn into_response(self) -> Response {
         match self {
             SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST.into_response(),
-            SubscribeError::DatabaseError(_)
+            SubscribeError::PoolError(_)
+            | SubscribeError::InsertSubscriberError(_)
+            | SubscribeError::TransactionCommitError(_)
             | SubscribeError::StoreTokenError(_)
             | SubscribeError::SendEmailError(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -51,7 +60,7 @@ impl From<reqwest::Error> for SubscribeError {
 
 impl From<sea_orm::DbErr> for SubscribeError {
     fn from(e: sea_orm::DbErr) -> Self {
-        Self::DatabaseError(e)
+        Self::PoolError(e)
     }
 }
 
@@ -69,11 +78,42 @@ impl From<String> for SubscribeError {
 
 impl std::fmt::Display for SubscribeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Failed to create a new subscriber.")
+        match self {
+            SubscribeError::ValidationError(e) => write!(f, "Validation error: {}", e),
+            SubscribeError::PoolError(_) => {
+                write!(f, "Failed to acquire a Postgres connection from the pool")
+            }
+            SubscribeError::InsertSubscriberError(_) => {
+                write!(f, "Failed to insert new subscriber in the database.")
+            }
+            SubscribeError::TransactionCommitError(_) => {
+                write!(
+                    f,
+                    "Failed to commit SQL transaction to store a new subscriber."
+                )
+            }
+            SubscribeError::StoreTokenError(_) => write!(
+                f,
+                "Failed to store the confirmation token for a new subscriber."
+            ),
+            SubscribeError::SendEmailError(_) => write!(f, "Failed to send a confirmation email."),
+        }
     }
 }
 
-impl std::error::Error for SubscribeError {}
+impl std::error::Error for SubscribeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            // &str does not implement `Error` - we consider it the root cause
+            SubscribeError::ValidationError(_) => None,
+            SubscribeError::PoolError(e) => Some(e),
+            SubscribeError::InsertSubscriberError(e) => Some(e),
+            SubscribeError::TransactionCommitError(e) => Some(e),
+            SubscribeError::StoreTokenError(e) => Some(e),
+            SubscribeError::SendEmailError(e) => Some(e),
+        }
+    }
+}
 
 pub struct StoreTokenError(sea_orm::DbErr);
 
@@ -156,12 +196,21 @@ pub async fn subscribe(
     Form(form): Form<FormData>,
 ) -> Result<Response, SubscribeError> {
     let new_subscriber = form.try_into()?;
-    let mut transaction = state.db_connection.begin().await?;
-    let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber).await?;
+    let mut transaction = state
+        .db_connection
+        .begin()
+        .await
+        .map_err(SubscribeError::PoolError)?;
+    let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
+        .await
+        .map_err(SubscribeError::InsertSubscriberError)?;
     let subscription_token = generate_subscription_token();
     store_token(&mut transaction, &subscription_token, subscriber_id).await?;
 
-    transaction.commit().await?;
+    transaction
+        .commit()
+        .await
+        .map_err(SubscribeError::TransactionCommitError)?;
 
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
