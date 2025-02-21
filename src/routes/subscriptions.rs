@@ -26,16 +26,10 @@ use crate::{
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationError(String),
-    #[error("Failed to acquire a Postgres connection from the pool")]
-    PoolError(sea_orm::DbErr),
-    #[error("Failed to insert new subscriber in the database.")]
-    InsertSubscriberError(sea_orm::DbErr),
-    #[error("Failed to store the confirmation token for a new subscriber.")]
-    TransactionCommitError(sea_orm::DbErr),
-    #[error("Failed to commit SQL transaction to store a new subscriber.")]
-    StoreTokenError(StoreTokenError),
-    #[error("Failed to send a confirmation email.")]
-    SendEmailError(reqwest::Error),
+    // Transparent delegates both `Display`'s and `source`'s implementation
+    // to the type wrapped by `UnexpectedError`.
+    #[error(transparent)]
+    UnexpectedError(#[from] Box<dyn std::error::Error>),
 }
 
 impl std::fmt::Debug for SubscribeError {
@@ -48,32 +42,8 @@ impl IntoResponse for SubscribeError {
     fn into_response(self) -> Response {
         match self {
             SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST.into_response(),
-            SubscribeError::PoolError(_)
-            | SubscribeError::InsertSubscriberError(_)
-            | SubscribeError::TransactionCommitError(_)
-            | SubscribeError::StoreTokenError(_)
-            | SubscribeError::SendEmailError(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
+            SubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
-    }
-}
-
-impl From<reqwest::Error> for SubscribeError {
-    fn from(e: reqwest::Error) -> Self {
-        Self::SendEmailError(e)
-    }
-}
-
-impl From<sea_orm::DbErr> for SubscribeError {
-    fn from(e: sea_orm::DbErr) -> Self {
-        Self::PoolError(e)
-    }
-}
-
-impl From<StoreTokenError> for SubscribeError {
-    fn from(e: StoreTokenError) -> Self {
-        Self::StoreTokenError(e)
     }
 }
 
@@ -168,17 +138,19 @@ pub async fn subscribe(
         .db_connection
         .begin()
         .await
-        .map_err(SubscribeError::PoolError)?;
+        .map_err(|e| SubscribeError::UnexpectedError(Box::new(e)))?;
     let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
         .await
-        .map_err(SubscribeError::InsertSubscriberError)?;
+        .map_err(|e| SubscribeError::UnexpectedError(Box::new(e)))?;
     let subscription_token = generate_subscription_token();
-    store_token(&mut transaction, &subscription_token, subscriber_id).await?;
+    store_token(&mut transaction, &subscription_token, subscriber_id)
+        .await
+        .map_err(|e| SubscribeError::UnexpectedError(Box::new(e)))?;
 
     transaction
         .commit()
         .await
-        .map_err(SubscribeError::TransactionCommitError)?;
+        .map_err(|e| SubscribeError::UnexpectedError(Box::new(e)))?;
 
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
@@ -188,7 +160,8 @@ pub async fn subscribe(
         state.base_url,
         subscription_token.as_str(),
     )
-    .await?;
+    .await
+    .map_err(|e| SubscribeError::UnexpectedError(Box::new(e)))?;
 
     Ok(StatusCode::OK.into_response())
 }
