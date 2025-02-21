@@ -33,10 +33,12 @@ pub enum SubscribeError {
 impl IntoResponse for SubscribeError {
     fn into_response(self) -> Response {
         match self {
-            SubscribeError::ValidationError(x) => x.into_response(),
-            SubscribeError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            SubscribeError::StoreTokenError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-            SubscribeError::SendEmailError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            SubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST.into_response(),
+            SubscribeError::DatabaseError(_)
+            | SubscribeError::StoreTokenError(_)
+            | SubscribeError::SendEmailError(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
         }
     }
 }
