@@ -22,6 +22,25 @@ use crate::{
     email_client::EmailClient,
 };
 
+#[derive(Debug)]
+pub struct StoreTokenError(sea_orm::DbErr);
+
+impl std::fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while trying to store a confirmation token."
+        )
+    }
+}
+
+impl std::error::Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // The compiler transparently casts `sea_orm::DbErr` into a `&dyn Error`
+        Some(&self.0)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct FormData {
     pub name: String,
@@ -159,13 +178,13 @@ pub async fn send_confirmation_email(
 
 #[tracing::instrument(
     name = "Storing subscription token in the database",
-    skip(transaction, subscriber_id, subscription_token)
+    skip(transaction, subscription_token, subscriber_id)
 )]
 pub async fn store_token(
     transaction: &DatabaseTransaction,
     subscription_token: &str,
     subscriber_id: Uuid,
-) -> Result<(), sea_orm::DbErr> {
+) -> Result<(), StoreTokenError> {
     let token = subscription_tokens::ActiveModel {
         subscription_token: Set(subscription_token.to_string()),
         subscriber_id: Set(subscriber_id),
@@ -173,7 +192,7 @@ pub async fn store_token(
 
     token.insert(transaction).await.map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
-        e
+        StoreTokenError(e)
     })?;
 
     Ok(())
