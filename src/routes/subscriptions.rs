@@ -83,6 +83,10 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
+    if transaction.commit().await.is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
     if send_confirmation_email(
