@@ -22,7 +22,6 @@ use crate::{
     email_client::EmailClient,
 };
 
-#[derive(Debug)]
 pub struct StoreTokenError(sea_orm::DbErr);
 
 impl std::fmt::Display for StoreTokenError {
@@ -31,6 +30,12 @@ impl std::fmt::Display for StoreTokenError {
             f,
             "A database error was encountered while trying to store a confirmation token."
         )
+    }
+}
+
+impl std::fmt::Debug for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\nCaused by:\n\t{}", self, self.0)
     }
 }
 
