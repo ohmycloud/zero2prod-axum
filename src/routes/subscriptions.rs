@@ -5,11 +5,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
+use entity::entities::subscription_tokens;
 use entity::entities::subscriptions;
-use entity::entities::{prelude::*, subscription_tokens};
 use rand::distributions::Alphanumeric;
 use rand::{Rng, thread_rng};
-use sea_orm::{DatabaseConnection, EntityTrait, Set, prelude::DateTimeWithTimeZone};
+use sea_orm::{
+    ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait,
+    prelude::DateTimeWithTimeZone,
+};
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
@@ -63,12 +66,17 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    let subscriber_id = match insert_subscriber(&state, &new_subscriber).await {
+    let mut transaction = match state.db_connection.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
         Ok(subscriber_id) => subscriber_id,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     let subscription_token = generate_subscription_token();
-    if store_token(&state, &subscription_token, subscriber_id)
+    if store_token(&mut transaction, &subscription_token, subscriber_id)
         .await
         .is_err()
     {
@@ -94,10 +102,10 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
 
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(state, new_subscriber)
+    skip(transaction, new_subscriber)
 )]
 pub async fn insert_subscriber(
-    state: &AppState,
+    transaction: &DatabaseTransaction,
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sea_orm::DbErr> {
     let subscriber_id = Uuid::new_v4();
@@ -109,13 +117,10 @@ pub async fn insert_subscriber(
         status: Set("pending_confirmation".to_string()),
     };
 
-    Subscriptions::insert(subscription)
-        .exec(&state.db_connection)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+    subscription.insert(transaction).await.map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
 
     Ok(subscriber_id)
 }
@@ -150,10 +155,10 @@ pub async fn send_confirmation_email(
 
 #[tracing::instrument(
     name = "Storing subscription token in the database",
-    skip(state, subscriber_id, subscription_token)
+    skip(transaction, subscriber_id, subscription_token)
 )]
 pub async fn store_token(
-    state: &AppState,
+    transaction: &DatabaseTransaction,
     subscription_token: &str,
     subscriber_id: Uuid,
 ) -> Result<(), sea_orm::DbErr> {
@@ -161,13 +166,11 @@ pub async fn store_token(
         subscription_token: Set(subscription_token.to_string()),
         subscriber_id: Set(subscriber_id),
     };
-    SubscriptionTokens::insert(token)
-        .exec(&state.db_connection)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+
+    token.insert(transaction).await.map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
 
     Ok(())
 }
