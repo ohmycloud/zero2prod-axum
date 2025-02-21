@@ -35,6 +35,7 @@ pub struct TestApp {
 }
 
 /// Confirmation links embedded in the request to the email API
+#[derive(Debug)]
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
     pub plain_text: reqwest::Url,

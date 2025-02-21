@@ -89,7 +89,7 @@ pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>
         state.email_client,
         new_subscriber,
         state.base_url,
-        "mytoken",
+        subscription_token.as_str(),
     )
     .await
     .is_err()
