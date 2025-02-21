@@ -22,6 +22,57 @@ use crate::{
     email_client::EmailClient,
 };
 
+#[derive(Debug)]
+pub enum SubscribeError {
+    ValidationError(String),
+    DatabaseError(sea_orm::DbErr),
+    StoreTokenError(StoreTokenError),
+    SendEmailError(reqwest::Error),
+}
+
+impl IntoResponse for SubscribeError {
+    fn into_response(self) -> Response {
+        match self {
+            SubscribeError::ValidationError(x) => x.into_response(),
+            SubscribeError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            SubscribeError::StoreTokenError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            SubscribeError::SendEmailError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+}
+
+impl From<reqwest::Error> for SubscribeError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::SendEmailError(e)
+    }
+}
+
+impl From<sea_orm::DbErr> for SubscribeError {
+    fn from(e: sea_orm::DbErr) -> Self {
+        Self::DatabaseError(e)
+    }
+}
+
+impl From<StoreTokenError> for SubscribeError {
+    fn from(e: StoreTokenError) -> Self {
+        Self::StoreTokenError(e)
+    }
+}
+
+impl From<String> for SubscribeError {
+    fn from(e: String) -> Self {
+        Self::ValidationError(e)
+    }
+}
+
+impl std::fmt::Display for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Failed to create a new subscriber.")
+    }
+}
+
+impl std::error::Error for SubscribeError {}
+
 pub struct StoreTokenError(sea_orm::DbErr);
 
 impl std::fmt::Display for StoreTokenError {
@@ -88,6 +139,7 @@ pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
     Ok(NewSubscriber { email, name })
 }
 
+#[axum::debug_handler]
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(state, form),
@@ -97,48 +149,29 @@ pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
         subscriber_email = %form.email
     )
 )]
-pub async fn subscribe(State(state): State<AppState>, Form(form): Form<FormData>) -> Response {
-    let new_subscriber = match form.try_into() {
-        Ok(subscriber) => subscriber,
-        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    let mut transaction = match state.db_connection.begin().await {
-        Ok(transaction) => transaction,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
-
-    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
+pub async fn subscribe(
+    State(state): State<AppState>,
+    Form(form): Form<FormData>,
+) -> Result<Response, SubscribeError> {
+    let new_subscriber = form.try_into()?;
+    let mut transaction = state.db_connection.begin().await?;
+    let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber).await?;
     let subscription_token = generate_subscription_token();
-    if store_token(&mut transaction, &subscription_token, subscriber_id)
-        .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    store_token(&mut transaction, &subscription_token, subscriber_id).await?;
 
-    if transaction.commit().await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    transaction.commit().await?;
 
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
-    if send_confirmation_email(
+    send_confirmation_email(
         state.email_client,
         new_subscriber,
         state.base_url,
         subscription_token.as_str(),
     )
-    .await
-    .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    .await?;
 
-    StatusCode::OK.into_response()
+    Ok(StatusCode::OK.into_response())
 }
 
 #[tracing::instrument(
