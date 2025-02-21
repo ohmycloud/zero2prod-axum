@@ -22,12 +22,19 @@ use crate::{
     email_client::EmailClient,
 };
 
+#[derive(thiserror::Error)]
 pub enum SubscribeError {
+    #[error("{0}")]
     ValidationError(String),
+    #[error("Failed to acquire a Postgres connection from the pool")]
     PoolError(sea_orm::DbErr),
+    #[error("Failed to insert new subscriber in the database.")]
     InsertSubscriberError(sea_orm::DbErr),
+    #[error("Failed to store the confirmation token for a new subscriber.")]
     TransactionCommitError(sea_orm::DbErr),
+    #[error("Failed to commit SQL transaction to store a new subscriber.")]
     StoreTokenError(StoreTokenError),
+    #[error("Failed to send a confirmation email.")]
     SendEmailError(reqwest::Error),
 }
 
@@ -73,45 +80,6 @@ impl From<StoreTokenError> for SubscribeError {
 impl From<String> for SubscribeError {
     fn from(e: String) -> Self {
         Self::ValidationError(e)
-    }
-}
-
-impl std::fmt::Display for SubscribeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SubscribeError::ValidationError(e) => write!(f, "Validation error: {}", e),
-            SubscribeError::PoolError(_) => {
-                write!(f, "Failed to acquire a Postgres connection from the pool")
-            }
-            SubscribeError::InsertSubscriberError(_) => {
-                write!(f, "Failed to insert new subscriber in the database.")
-            }
-            SubscribeError::TransactionCommitError(_) => {
-                write!(
-                    f,
-                    "Failed to commit SQL transaction to store a new subscriber."
-                )
-            }
-            SubscribeError::StoreTokenError(_) => write!(
-                f,
-                "Failed to store the confirmation token for a new subscriber."
-            ),
-            SubscribeError::SendEmailError(_) => write!(f, "Failed to send a confirmation email."),
-        }
-    }
-}
-
-impl std::error::Error for SubscribeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            // &str does not implement `Error` - we consider it the root cause
-            SubscribeError::ValidationError(_) => None,
-            SubscribeError::PoolError(e) => Some(e),
-            SubscribeError::InsertSubscriberError(e) => Some(e),
-            SubscribeError::TransactionCommitError(e) => Some(e),
-            SubscribeError::StoreTokenError(e) => Some(e),
-            SubscribeError::SendEmailError(e) => Some(e),
-        }
     }
 }
 
@@ -195,7 +163,7 @@ pub async fn subscribe(
     State(state): State<AppState>,
     Form(form): Form<FormData>,
 ) -> Result<Response, SubscribeError> {
-    let new_subscriber = form.try_into()?;
+    let new_subscriber = form.try_into().map_err(SubscribeError::ValidationError)?;
     let mut transaction = state
         .db_connection
         .begin()
