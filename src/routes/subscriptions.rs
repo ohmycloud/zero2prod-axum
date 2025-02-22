@@ -78,7 +78,7 @@ impl std::error::Error for StoreTokenError {
     }
 }
 
-fn error_chain_fmt(
+pub fn error_chain_fmt(
     e: &impl std::error::Error,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
@@ -120,7 +120,6 @@ pub fn parse_subscriber(form: FormData) -> Result<NewSubscriber, String> {
     Ok(NewSubscriber { email, name })
 }
 
-#[axum::debug_handler]
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(state, form),
