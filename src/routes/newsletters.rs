@@ -85,6 +85,27 @@ async fn get_stored_credentials(
     Ok(user)
 }
 
+#[tracing::instrument(
+    name = "Verify password hash",
+    skip(expected_password_hash, password_candidate)
+)]
+fn verify_password_hash(
+    expected_password_hash: SecretString,
+    password_candidate: SecretString,
+) -> Result<(), PublishError> {
+    let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
+        .context("Failed to parse hash in PHC string format.")
+        .map_err(PublishError::UnexpectedError)?;
+
+    Argon2::default()
+        .verify_password(
+            password_candidate.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .context("Invalid password.")
+        .map_err(PublishError::AuthError)
+}
+
 #[tracing::instrument(name = "Validate credentials", skip(credentials, db_connection))]
 async fn validate_credentials(
     credentials: Credentials,
@@ -96,18 +117,12 @@ async fn validate_credentials(
             .map_err(PublishError::UnexpectedError)?
             .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknow username")))?;
 
-    let expected_password_hash =
-        PasswordHash::new(&expected_password_hash.expose_secret()).unwrap();
-
-    tracing::info_span!("Verify password hash")
-        .in_scope(|| {
-            Argon2::default().verify_password(
-                credentials.password.expose_secret().as_bytes(),
-                &expected_password_hash,
-            )
-        })
-        .context("Invalid password.")
-        .map_err(PublishError::AuthError)?;
+    tokio::task::spawn_blocking(move || {
+        verify_password_hash(expected_password_hash, credentials.password)
+    })
+    .await
+    .context("Failed to perform a blocking task to verify password hash.")?
+    .unwrap();
 
     Ok(user_id)
 }
