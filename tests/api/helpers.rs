@@ -46,18 +46,6 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
-    async fn store(&self, db_connection: &DatabaseConnection) {
-        let salt = SaltString::generate(&mut rand::thread_rng());
-        // Match parameters of the default password
-        let password_hash = Argon2::new(
-            Algorithm::Argon2id,
-            argon2::Version::V0x13,
-            Params::new(15000, 2, 1, None).unwrap(),
-        )
-        .hash_password(self.test_user.password.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
-    }
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
@@ -120,12 +108,15 @@ impl TestUser {
 
     async fn store(&self, db_connection: &DatabaseConnection) {
         let salt = SaltString::generate(&mut rand::thread_rng());
-        // We don't care about the exact Argon2 parameters here
-        // given that it's for testing purposes
-        let password_hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)
-            .expect("Failed to hash password")
-            .to_string();
+        // Match parameters of the default password
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
 
         let user = users::ActiveModel {
             user_id: Set(self.user_id),
