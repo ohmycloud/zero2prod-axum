@@ -1,5 +1,6 @@
 use super::{AppState, error_chain_fmt};
 use crate::domain::SubscriberEmail;
+use crate::telemetry::spawn_blocking_with_tracing;
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::extract::{Json, State};
@@ -117,9 +118,8 @@ async fn validate_credentials(
             .map_err(PublishError::UnexpectedError)?
             .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknow username")))?;
 
-    let current_span = tracing::Span::current();
-    tokio::task::spawn_blocking(move || {
-        current_span.in_scope(|| verify_password_hash(expected_password_hash, credentials.password))
+    spawn_blocking_with_tracing(move || {
+        verify_password_hash(expected_password_hash, credentials.password)
     })
     .await
     .context("Failed to perform a blocking task to verify password hash.")?
