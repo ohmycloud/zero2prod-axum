@@ -123,7 +123,7 @@ async fn validate_credentials(
     })
     .await
     .context("Failed to perform a blocking task to verify password hash.")?
-    .unwrap();
+    .map_err(|_| anyhow::anyhow!("Invalid pasword."))?;
 
     Ok(user_id)
 }
