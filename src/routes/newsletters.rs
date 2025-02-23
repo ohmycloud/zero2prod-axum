@@ -1,9 +1,8 @@
 use super::{AppState, error_chain_fmt};
 use crate::domain::SubscriberEmail;
 use anyhow::Context;
-use axum::body::Body;
 use axum::extract::{Json, State};
-use axum::http::{HeaderMap, HeaderValue, Request};
+use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use entity::entities::{prelude::*, subscriptions};
@@ -33,6 +32,8 @@ struct ConfirmedSubscriber {
 pub enum PublishError {
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
+    #[error("Authentication failed")]
+    AuthError(#[source] anyhow::Error),
 }
 
 impl std::fmt::Debug for PublishError {
@@ -45,6 +46,15 @@ impl IntoResponse for PublishError {
     fn into_response(self) -> Response {
         match self {
             PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            PublishError::AuthError(_) => {
+                let mut response = StatusCode::UNAUTHORIZED.into_response();
+                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
+
+                response
+                    .headers_mut()
+                    .insert("WWW-Authenticate", header_value);
+                response
+            }
         }
     }
 }
@@ -95,7 +105,8 @@ pub async fn publish_newsletter(
     State(state): State<AppState>,
     Json(body): Json<BodyData>,
 ) -> Result<Response, PublishError> {
-    let _credentials = basic_authentication(&headers);
+    // Bubble up the error, performing the necessary conversion
+    let _credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
     for subscriber in subscribers {
         match subscriber {
