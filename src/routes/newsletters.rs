@@ -1,7 +1,7 @@
 use super::{AppState, error_chain_fmt};
 use crate::domain::SubscriberEmail;
 use anyhow::Context;
-use argon2::{Algorithm, Argon2, Params, Version};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::extract::{Json, State};
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Response};
@@ -11,7 +11,6 @@ use reqwest::StatusCode;
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
 use secrecy::{ExposeSecret, SecretString};
-use sha3::Digest;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct BodyData {
@@ -70,28 +69,31 @@ async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
 ) -> Result<uuid::Uuid, PublishError> {
-    let hasher = Argon2::new(
-        Algorithm::Argon2id,
-        Version::V0x13,
-        Params::new(15000, 2, 1, None)
-            .context("Failed to build Argon2 parameters")
-            .map_err(PublishError::UnexpectedError)?,
-    );
-    let password_hash = sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
-    // Lowercase hexadecimal encoding.
-    let password_hash = format!("{:x}", password_hash);
-    let user_id = Users::find()
+    let user = Users::find()
         .filter(users::Column::Username.eq(credentials.username))
-        .filter(users::Column::PasswordHash.eq(password_hash))
         .one(db_connection)
         .await
         .context("Failed to perform a query to validate auth credentials.")
         .map_err(PublishError::UnexpectedError)?;
 
-    user_id
-        .map(|r| r.user_id)
-        .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
-        .map_err(PublishError::AuthError)
+    let (expected_password_hash, user_id) = match user {
+        Some(user) => (user.password_hash, user.user_id),
+        None => return Err(PublishError::AuthError(anyhow::anyhow!("Unknown username"))),
+    };
+
+    let expected_password_hash = PasswordHash::new(&expected_password_hash)
+        .context("Failed to parse hash in PHC string format.")
+        .map_err(PublishError::UnexpectedError)?;
+
+    Argon2::default()
+        .verify_password(
+            credentials.password.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .context("Invalid password.")
+        .map_err(PublishError::AuthError)?;
+
+    Ok(user_id)
 }
 
 fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {

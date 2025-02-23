@@ -14,7 +14,6 @@ impl MigrationTrait for Migration {
                     .col(uuid(Users::UserId).primary_key())
                     .col(string(Users::Username).not_null().unique_key())
                     .col(string(Users::PasswordHash).not_null())
-                    .col(string(Users::Salt).not_null())
                     .to_owned(),
             )
             .await
@@ -33,5 +32,4 @@ enum Users {
     UserId,
     Username,
     PasswordHash,
-    Salt,
 }
