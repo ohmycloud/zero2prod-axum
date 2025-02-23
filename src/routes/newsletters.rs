@@ -65,31 +65,47 @@ struct Credentials {
     password: SecretString,
 }
 
+#[tracing::instrument(name = "Get stored credentials", skip(username, db_connection))]
+async fn get_stored_credentials(
+    username: &str,
+    db_connection: &DatabaseConnection,
+) -> Result<Option<(uuid::Uuid, SecretString)>, anyhow::Error> {
+    let user = Users::find()
+        .filter(users::Column::Username.eq(username))
+        .one(db_connection)
+        .await
+        .context("Failed to perform a query to validate auth credentials.")?
+        .map(|user| {
+            (
+                user.user_id,
+                SecretString::new(Box::from(user.password_hash)),
+            )
+        });
+
+    Ok(user)
+}
+
+#[tracing::instrument(name = "Validate credentials", skip(credentials, db_connection))]
 async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
 ) -> Result<uuid::Uuid, PublishError> {
-    let user = Users::find()
-        .filter(users::Column::Username.eq(credentials.username))
-        .one(db_connection)
-        .await
-        .context("Failed to perform a query to validate auth credentials.")
-        .map_err(PublishError::UnexpectedError)?;
+    let (user_id, expected_password_hash) =
+        get_stored_credentials(&credentials.username, db_connection)
+            .await
+            .map_err(PublishError::UnexpectedError)?
+            .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknow username")))?;
 
-    let (expected_password_hash, user_id) = match user {
-        Some(user) => (user.password_hash, user.user_id),
-        None => return Err(PublishError::AuthError(anyhow::anyhow!("Unknown username"))),
-    };
+    let expected_password_hash =
+        PasswordHash::new(&expected_password_hash.expose_secret()).unwrap();
 
-    let expected_password_hash = PasswordHash::new(&expected_password_hash)
-        .context("Failed to parse hash in PHC string format.")
-        .map_err(PublishError::UnexpectedError)?;
-
-    Argon2::default()
-        .verify_password(
-            credentials.password.expose_secret().as_bytes(),
-            &expected_password_hash,
-        )
+    tracing::info_span!("Verify password hash")
+        .in_scope(|| {
+            Argon2::default().verify_password(
+                credentials.password.expose_secret().as_bytes(),
+                &expected_password_hash,
+            )
+        })
         .context("Invalid password.")
         .map_err(PublishError::AuthError)?;
 
