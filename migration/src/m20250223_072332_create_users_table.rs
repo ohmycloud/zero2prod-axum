@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(uuid(Users::UserId).primary_key())
                     .col(string(Users::Username).not_null().unique_key())
-                    .col(string(Users::Password).not_null())
+                    .col(string(Users::PasswordHash).not_null())
                     .to_owned(),
             )
             .await
@@ -31,5 +31,5 @@ enum Users {
     Table,
     UserId,
     Username,
-    Password,
+    PasswordHash,
 }

@@ -1,8 +1,7 @@
-use entity::entities::{prelude::*, subscriptions, users};
+use entity::entities::users;
 use sea_orm::sqlx::postgres::PgPoolOptions;
-use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, EntityTrait, QuerySelect, Set, SqlxPostgresConnector,
-};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, Set, SqlxPostgresConnector};
+use sha3::Digest;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
@@ -35,6 +34,7 @@ pub struct TestApp {
     pub port: u16,
     pub db_connection: DatabaseConnection,
     pub email_server: MockServer,
+    pub test_user: TestUser,
 }
 
 /// Confirmation links embedded in the request to the email API
@@ -45,22 +45,10 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
-    pub async fn test_user(&self) -> (String, String) {
-        let row = Users::find()
-            .limit(1)
-            .one(&self.db_connection)
-            .await
-            .expect("Failed to find user")
-            .unwrap();
-
-        (row.username, row.password)
-    }
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        let (username, password) = self.test_user().await;
-
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(username, Some(password))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
@@ -101,16 +89,37 @@ impl TestApp {
     }
 }
 
-async fn add_test_user(db_connection: &DatabaseConnection) {
-    let user = users::ActiveModel {
-        user_id: Set(Uuid::new_v4()),
-        username: Set(Uuid::new_v4().to_string()),
-        password: Set(Uuid::new_v4().to_string()),
-    };
-    user.insert(db_connection)
-        .await
-        .expect("Failed to create test users.");
+#[derive(Debug)]
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
 }
+
+impl TestUser {
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    async fn store(&self, db_connection: &DatabaseConnection) {
+        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
+        let password_hash = format!("{:x}", password_hash);
+
+        let user = users::ActiveModel {
+            user_id: Set(self.user_id),
+            username: Set(self.username.clone()),
+            password_hash: Set(password_hash),
+        };
+        user.insert(db_connection)
+            .await
+            .expect("Failed to store test user.");
+    }
+}
+
 // Launch our application in the background
 pub async fn spawn_app() -> TestApp {
     // The first time `initialize` is invoked the code in `TRACING` is executed.
@@ -152,9 +161,10 @@ pub async fn spawn_app() -> TestApp {
         port: application_port,
         db_connection: get_db_connection(&configuration.database),
         email_server,
+        test_user: TestUser::generate(),
     };
 
-    add_test_user(&test_app.db_connection).await;
+    test_app.test_user.store(&test_app.db_connection).await;
 
     test_app
 }

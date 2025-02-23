@@ -10,6 +10,7 @@ use reqwest::StatusCode;
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
 use secrecy::{ExposeSecret, SecretString};
+use sha3::Digest;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct BodyData {
@@ -68,9 +69,12 @@ async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
 ) -> Result<uuid::Uuid, PublishError> {
+    let password_hash = sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
+    // Lowercase hexadecimal encoding.
+    let password_hash = format!("{:x}", password_hash);
     let user_id = Users::find()
         .filter(users::Column::Username.eq(credentials.username))
-        .filter(users::Column::Password.eq(credentials.password.expose_secret()))
+        .filter(users::Column::PasswordHash.eq(password_hash))
         .one(db_connection)
         .await
         .context("Failed to perform a query to validate auth credentials.")
