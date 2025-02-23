@@ -1,5 +1,5 @@
 use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher};
 use entity::entities::users;
 use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set, SqlxPostgresConnector};
@@ -46,6 +46,18 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
+    async fn store(&self, db_connection: &DatabaseConnection) {
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        // Match parameters of the default password
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.test_user.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
+    }
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
