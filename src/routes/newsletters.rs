@@ -5,11 +5,11 @@ use axum::extract::{Json, State};
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
-use entity::entities::{prelude::*, subscriptions};
+use entity::entities::{prelude::*, subscriptions, users};
 use reqwest::StatusCode;
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct BodyData {
@@ -64,6 +64,24 @@ struct Credentials {
     password: SecretString,
 }
 
+async fn validate_credentials(
+    credentials: Credentials,
+    db_connection: &DatabaseConnection,
+) -> Result<uuid::Uuid, PublishError> {
+    let user_id = Users::find()
+        .filter(users::Column::Username.eq(credentials.username))
+        .filter(users::Column::Password.eq(credentials.password.expose_secret()))
+        .one(db_connection)
+        .await
+        .context("Failed to perform a query to validate auth credentials.")
+        .map_err(PublishError::UnexpectedError)?;
+
+    user_id
+        .map(|r| r.user_id)
+        .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
+        .map_err(PublishError::AuthError)
+}
+
 fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
     // The header value, if present, must be a valid UTF8 string
     let header_value = headers
@@ -99,14 +117,21 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Erro
     })
 }
 
-#[axum::debug_handler]
+#[tracing::instrument(
+    name = "Publishing a newsletter issue",
+    skip(headers, state, body),
+    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+)]
 pub async fn publish_newsletter(
     headers: HeaderMap,
     State(state): State<AppState>,
     Json(body): Json<BodyData>,
 ) -> Result<Response, PublishError> {
     // Bubble up the error, performing the necessary conversion
-    let _credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
+    let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
+    tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
+    let user_id = validate_credentials(credentials, &state.db_connection).await?;
+    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
     for subscriber in subscribers {
         match subscriber {
