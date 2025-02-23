@@ -1,7 +1,8 @@
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use entity::entities::users;
 use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set, SqlxPostgresConnector};
-use sha3::Digest;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
@@ -106,8 +107,13 @@ impl TestUser {
     }
 
     async fn store(&self, db_connection: &DatabaseConnection) {
-        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
-        let password_hash = format!("{:x}", password_hash);
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        // We don't care about the exact Argon2 parameters here
+        // given that it's for testing purposes
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .expect("Failed to hash password")
+            .to_string();
 
         let user = users::ActiveModel {
             user_id: Set(self.user_id),
