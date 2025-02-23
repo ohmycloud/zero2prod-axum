@@ -1,6 +1,7 @@
 use super::{AppState, error_chain_fmt};
 use crate::domain::SubscriberEmail;
 use anyhow::Context;
+use argon2::{Algorithm, Argon2, Params, Version};
 use axum::extract::{Json, State};
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::{IntoResponse, Response};
@@ -69,6 +70,13 @@ async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
 ) -> Result<uuid::Uuid, PublishError> {
+    let hasher = Argon2::new(
+        Algorithm::Argon2id,
+        Version::V0x13,
+        Params::new(15000, 2, 1, None)
+            .context("Failed to build Argon2 parameters")
+            .map_err(PublishError::UnexpectedError)?,
+    );
     let password_hash = sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
     // Lowercase hexadecimal encoding.
     let password_hash = format!("{:x}", password_hash);
