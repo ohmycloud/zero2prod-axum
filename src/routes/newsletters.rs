@@ -112,20 +112,30 @@ async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
 ) -> Result<uuid::Uuid, PublishError> {
-    let (user_id, expected_password_hash) =
+    let mut user_id = None;
+    let mut expected_password_hash = SecretString::new(Box::from(
+        "$argon2id$v=19$m=15000,t=2,p=1$\
+        gZiV/M1gPc22ElAH/Jh1Hw$\
+        CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno",
+    ));
+
+    if let Some((stored_user_id, stored_password_hash)) =
         get_stored_credentials(&credentials.username, db_connection)
             .await
             .map_err(PublishError::UnexpectedError)?
-            .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknow username")))?;
+    {
+        user_id = Some(stored_user_id);
+        expected_password_hash = stored_password_hash;
+    }
 
     spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, credentials.password)
     })
     .await
-    .context("Failed to perform a blocking task to verify password hash.")?
-    .map_err(|_| anyhow::anyhow!("Invalid pasword."))?;
+    .context("Failed to perform a blocking task to verify password hash.")
+    .map_err(|_| anyhow::anyhow!("Invalid pasword."))??;
 
-    Ok(user_id)
+    user_id.ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))
 }
 
 fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
