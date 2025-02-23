@@ -1,3 +1,5 @@
+use crate::domain::SubscriberEmail;
+use anyhow::Context;
 use axum::extract::{Json, State};
 use axum::response::{IntoResponse, Response};
 use entity::entities::{prelude::*, subscriptions};
@@ -19,8 +21,9 @@ pub struct Content {
     text: String,
 }
 
+#[derive(Debug)]
 struct ConfirmedSubscriber {
-    email: String,
+    email: SubscriberEmail,
 }
 
 #[derive(thiserror::Error)]
@@ -47,7 +50,19 @@ pub async fn publish_newsletter(
     State(state): State<AppState>,
     Json(body): Json<BodyData>,
 ) -> Result<Response, PublishError> {
-    let _subscribers = get_confirmed_subscribers(&state.db_connection).await?;
+    let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
+    for subscriber in subscribers {
+        state
+            .email_client
+            .send_email(
+                subscriber.email.clone(),
+                &body.title,
+                &body.content.html,
+                &body.content.text,
+            )
+            .await
+            .with_context(|| format!("Failed to send newsletter issue to {}", subscriber.email))?;
+    }
     Ok(StatusCode::OK.into_response())
 }
 
@@ -61,7 +76,16 @@ async fn get_confirmed_subscribers(
         .await
         .expect("Failed to fetch data.")
         .into_iter()
-        .map(|model| ConfirmedSubscriber { email: model.email })
+        .filter_map(|r| match SubscriberEmail::parse(r.email) {
+            Ok(email) => Some(ConfirmedSubscriber { email }),
+            Err(error) => {
+                tracing::warn!(
+                    "A confirmed subscriber is using an invalid email address.\n {}",
+                    error
+                );
+                None
+            }
+        })
         .collect::<Vec<ConfirmedSubscriber>>();
 
     Ok(subscribers)
