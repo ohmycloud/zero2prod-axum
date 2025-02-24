@@ -1,6 +1,14 @@
+use axum::Form;
 use axum::response::{Html, IntoResponse, Redirect, Response};
+use secrecy::SecretString;
 
-pub async fn login() -> Response {
+#[derive(Debug, serde::Deserialize)]
+pub struct FormData {
+    username: String,
+    password: SecretString,
+}
+
+pub async fn login(Form(form): Form<FormData>) -> Response {
     Redirect::to("/").into_response()
 }
 

@@ -1,4 +1,5 @@
 use super::{AppState, error_chain_fmt};
+use crate::authentication::AuthError;
 use crate::domain::SubscriberEmail;
 use crate::telemetry::spawn_blocking_with_tracing;
 use anyhow::Context;
@@ -93,10 +94,9 @@ async fn get_stored_credentials(
 fn verify_password_hash(
     expected_password_hash: SecretString,
     password_candidate: SecretString,
-) -> Result<(), PublishError> {
+) -> Result<(), AuthError> {
     let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
-        .context("Failed to parse hash in PHC string format.")
-        .map_err(PublishError::UnexpectedError)?;
+        .context("Failed to parse hash in PHC string format.")?;
 
     Argon2::default()
         .verify_password(
@@ -104,14 +104,14 @@ fn verify_password_hash(
             &expected_password_hash,
         )
         .context("Invalid password.")
-        .map_err(PublishError::AuthError)
+        .map_err(AuthError::InvalidCredentials)
 }
 
 #[tracing::instrument(name = "Validate credentials", skip(credentials, db_connection))]
 async fn validate_credentials(
     credentials: Credentials,
     db_connection: &DatabaseConnection,
-) -> Result<uuid::Uuid, PublishError> {
+) -> Result<uuid::Uuid, AuthError> {
     let mut user_id = None;
     let mut expected_password_hash = SecretString::new(Box::from(
         "$argon2id$v=19$m=15000,t=2,p=1$\
@@ -122,7 +122,7 @@ async fn validate_credentials(
     if let Some((stored_user_id, stored_password_hash)) =
         get_stored_credentials(&credentials.username, db_connection)
             .await
-            .map_err(PublishError::UnexpectedError)?
+            .map_err(AuthError::InvalidCredentials)?
     {
         user_id = Some(stored_user_id);
         expected_password_hash = stored_password_hash;
@@ -135,7 +135,7 @@ async fn validate_credentials(
     .context("Failed to perform a blocking task to verify password hash.")
     .map_err(|_| anyhow::anyhow!("Invalid pasword."))??;
 
-    user_id.ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))
+    user_id.ok_or_else(|| AuthError::InvalidCredentials(anyhow::anyhow!("Unknown username.")))
 }
 
 fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
@@ -186,7 +186,12 @@ pub async fn publish_newsletter(
     // Bubble up the error, performing the necessary conversion
     let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &state.db_connection).await?;
+    let user_id = validate_credentials(credentials, &state.db_connection)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
+            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
+        })?;
     tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
     for subscriber in subscribers {
