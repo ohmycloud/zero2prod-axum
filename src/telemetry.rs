@@ -3,7 +3,8 @@ use tracing::Subscriber;
 use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
-use tracing_subscriber::fmt::MakeWriter;
+use tracing_subscriber::fmt::time::ChronoLocal;
+use tracing_subscriber::fmt::{self, MakeWriter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{EnvFilter, Registry};
 
@@ -29,8 +30,12 @@ where
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = BunyanFormattingLayer::new(name, sink);
+    let time_fmt_layer = fmt::Layer::default()
+        .with_target(false)
+        .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S".to_string()));
     Registry::default()
         .with(env_filter)
+        .with(time_fmt_layer)
         .with(JsonStorageLayer)
         .with(formatting_layer)
 }

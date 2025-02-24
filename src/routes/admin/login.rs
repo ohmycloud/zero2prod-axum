@@ -1,9 +1,9 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{AppState, error_chain_fmt};
-use axum::Form;
-use axum::extract::State;
-use axum::http::StatusCode;
+use axum::extract::{Query, State};
+use axum::http::{HeaderName, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
+use axum::{Form, http};
 use secrecy::SecretString;
 
 #[derive(Debug, serde::Deserialize)]
@@ -28,10 +28,15 @@ impl std::fmt::Debug for LoginError {
 
 impl IntoResponse for LoginError {
     fn into_response(self) -> Response {
-        match self {
-            LoginError::AuthError(_) => StatusCode::UNAUTHORIZED.into_response(),
-            LoginError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        }
+        let encoded_error = urlencoding::Encoded::new(self.to_string());
+        Response::builder()
+            .status(StatusCode::SEE_OTHER)
+            .header(
+                http::header::LOCATION,
+                format!("/login?error={}", encoded_error),
+            )
+            .body(axum::body::Body::empty())
+            .unwrap()
     }
 }
 
@@ -61,6 +66,16 @@ pub async fn login(
     Ok(Redirect::to("/").into_response())
 }
 
-pub async fn login_form() -> Response {
-    Html(include_str!("login.html")).into_response()
+#[derive(Debug, serde::Deserialize)]
+pub struct QueryParams {
+    error: Option<String>,
+}
+
+pub async fn login_form(query: Query<QueryParams>) -> Response {
+    let error_html = match query.0.error {
+        Some(error_message) => format!("<p><i>{error_message}</i></p>"),
+        None => "".into(),
+    };
+    let html_template = include_str!("login_error.html");
+    Html(format!("{html_template}")).into_response()
 }
