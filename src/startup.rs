@@ -1,7 +1,10 @@
 use crate::{
     configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
-    routes::{AppState, confirm, health_check::*, home, publish_newsletter, subscribe},
+    routes::{
+        AppState, confirm, greet, health_check, home, index, login_form, publish_newsletter,
+        subscribe,
+    },
 };
 use axum::{
     Router,
@@ -84,6 +87,7 @@ pub fn run(
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
         .route("/", get(home))
+        .route("/login", get(login_form))
         .route("/index", get(index))
         .route("/{name}", get(greet))
         .with_state(app_state.clone());
