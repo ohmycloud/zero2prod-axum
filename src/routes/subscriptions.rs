@@ -14,6 +14,7 @@ use sea_orm::{
     ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait,
     prelude::DateTimeWithTimeZone,
 };
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
@@ -102,6 +103,7 @@ pub struct AppState {
     pub db_connection: DatabaseConnection,
     pub email_client: EmailClient,
     pub base_url: String,
+    pub secret: SecretString,
 }
 
 impl TryFrom<FormData> for NewSubscriber {

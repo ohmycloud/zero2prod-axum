@@ -13,6 +13,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
+use secrecy::SecretString;
 use tokio::net::TcpListener;
 
 type Server = Serve<TcpListener, IntoMakeService<Router>, Router>;
@@ -52,6 +53,7 @@ impl Application {
             db_connection,
             email_client,
             configuration.application.base_url,
+            configuration.application.hmac_secret,
         )?;
 
         Ok(Self { port, server })
@@ -73,11 +75,13 @@ pub fn run(
     db_connection: DatabaseConnection,
     email_client: EmailClient,
     base_url: String,
+    secret: SecretString,
 ) -> Result<Server, std::io::Error> {
     let app_state = AppState {
         db_connection,
         email_client,
         base_url,
+        secret,
     };
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
@@ -130,6 +134,7 @@ pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
         db_connection,
         email_client,
         configuration.application.base_url,
+        configuration.application.hmac_secret,
     )
 }
 

@@ -5,7 +5,8 @@ use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Form, http};
 use handlebars::Handlebars;
-use secrecy::SecretString;
+use hmac::{Hmac, Mac};
+use secrecy::{ExposeSecret, SecretString};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FormData {
@@ -29,12 +30,19 @@ impl std::fmt::Debug for LoginError {
 
 impl IntoResponse for LoginError {
     fn into_response(self) -> Response {
-        let encoded_error = urlencoding::Encoded::new(self.to_string());
+        let query_string = format!("error={}", urlencoding::Encoded::new(self.to_string()));
+        let secret: &[u8] = todo!();
+        let hmac_tag = {
+            let mut mac = Hmac::<sha2::Sha256>::new_from_slice(secret).unwrap();
+            mac.update(query_string.as_bytes());
+            mac.finalize().into_bytes()
+        };
+
         Response::builder()
             .status(StatusCode::SEE_OTHER)
             .header(
                 http::header::LOCATION,
-                format!("/login?error={}", encoded_error),
+                format!("/login?{query_string}&tag={hmac_tag:x}"),
             )
             .body(axum::body::Body::empty())
             .unwrap()
@@ -48,23 +56,40 @@ impl IntoResponse for LoginError {
 pub async fn login(
     State(state): State<AppState>,
     Form(form): Form<FormData>,
-) -> Result<Response, LoginError> {
+) -> Result<Response, Response> {
     let credentials = Credentials {
         username: form.username,
         password: form.password,
     };
-
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &state.db_connection)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
-        })?;
 
-    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+    match validate_credentials(credentials, &state.db_connection).await {
+        Ok(user_id) => {
+            tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+            Ok(Redirect::to("/").into_response())
+        }
+        Err(error) => {
+            let error = match error {
+                AuthError::InvalidCredentials(_) => LoginError::AuthError(error.into()),
+                AuthError::UnexpectedError(_) => LoginError::UnexpectedError(error.into()),
+            };
 
-    Ok(Redirect::to("/").into_response())
+            let query_string = format!("error={}", urlencoding::Encoded::new(error.to_string()));
+
+            let hmac_tag = {
+                let mut mac =
+                    Hmac::<sha2::Sha256>::new_from_slice(state.secret.expose_secret().as_bytes())
+                        .unwrap();
+                mac.update(query_string.as_bytes());
+                mac.finalize().into_bytes()
+            };
+
+            let response =
+                Redirect::to(format!("/login?{}&tag={:x}", query_string, hmac_tag).as_str())
+                    .into_response();
+            Err(response)
+        }
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
