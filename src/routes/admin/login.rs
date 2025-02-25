@@ -1,9 +1,10 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{AppState, error_chain_fmt};
 use axum::extract::{Query, State};
-use axum::http::{HeaderName, StatusCode};
+use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Form, http};
+use handlebars::Handlebars;
 use secrecy::SecretString;
 
 #[derive(Debug, serde::Deserialize)]
@@ -73,9 +74,16 @@ pub struct QueryParams {
 
 pub async fn login_form(query: Query<QueryParams>) -> Response {
     let error_html = match query.0.error {
-        Some(error_message) => format!("<p><i>{error_message}</i></p>"),
+        Some(error_message) => format!(
+            "<p><i>{}</i></p>",
+            htmlescape::encode_minimal(&error_message)
+        ),
         None => "".into(),
     };
-    let html_template = include_str!("login_error.html");
-    Html(format!("{html_template}")).into_response()
+    let html_template = include_str!("login.html");
+    let reg = Handlebars::new();
+    let login_form = reg
+        .render_template(html_template, &error_html)
+        .expect("Failed to render login form.");
+    Html::from(login_form).into_response()
 }
