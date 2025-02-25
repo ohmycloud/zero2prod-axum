@@ -23,6 +23,7 @@ chrono = { version = "0.4.39", default-features = false, features = ["clock"] }
 claims = "0.8.0"
 config = "0.15.6"
 handlebars = "6.3.1"
+hex = "0.4.3"
 hmac = { version = "0.12.1", features = ["std"] }
 htmlescape = "0.3.1"
 log = "0.4.25"

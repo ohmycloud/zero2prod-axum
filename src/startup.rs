@@ -18,6 +18,9 @@ use tokio::net::TcpListener;
 
 type Server = Serve<TcpListener, IntoMakeService<Router>, Router>;
 
+#[derive(Debug, Clone)]
+pub struct HmacSecret(pub SecretString);
+
 pub struct Application {
     port: u16,
     server: Server,

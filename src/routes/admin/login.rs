@@ -1,5 +1,6 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{AppState, error_chain_fmt};
+use crate::startup::HmacSecret;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
@@ -94,15 +95,30 @@ pub async fn login(
 
 #[derive(Debug, serde::Deserialize)]
 pub struct QueryParams {
-    error: Option<String>,
+    error: String,
+    tag: String,
 }
 
-pub async fn login_form(query: Query<QueryParams>) -> Response {
-    let error_html = match query.0.error {
-        Some(error_message) => format!(
-            "<p><i>{}</i></p>",
-            htmlescape::encode_minimal(&error_message)
-        ),
+impl QueryParams {
+    fn verify(self, secret: &HmacSecret) -> Result<String, anyhow::Error> {
+        let tag = hex::decode(self.tag)?;
+        let query_string = format!("error={}", urlencoding::Encoded::new(&self.error));
+        let mut mac =
+            Hmac::<sha2::Sha256>::new_from_slice(secret.0.expose_secret().as_bytes()).unwrap();
+        mac.update(query_string.as_bytes());
+        mac.verify_slice(&tag)?;
+
+        Ok(self.error)
+    }
+}
+
+#[axum::debug_handler]
+pub async fn login_form(
+    State(state): State<AppState>,
+    query: Query<Option<QueryParams>>,
+) -> Response {
+    let error_html = match query.0 {
+        Some(query) => format!("<p><i>{}</i></p>", htmlescape::encode_minimal(&query.error)),
         None => "".into(),
     };
     let html_template = include_str!("login.html");
