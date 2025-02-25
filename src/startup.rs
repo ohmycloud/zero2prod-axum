@@ -56,7 +56,7 @@ impl Application {
             db_connection,
             email_client,
             configuration.application.base_url,
-            configuration.application.hmac_secret,
+            HmacSecret(configuration.application.hmac_secret),
         )?;
 
         Ok(Self { port, server })
@@ -78,7 +78,7 @@ pub fn run(
     db_connection: DatabaseConnection,
     email_client: EmailClient,
     base_url: String,
-    secret: SecretString,
+    secret: HmacSecret,
 ) -> Result<Server, std::io::Error> {
     let app_state = AppState {
         db_connection,
@@ -137,7 +137,7 @@ pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
         db_connection,
         email_client,
         configuration.application.base_url,
-        configuration.application.hmac_secret,
+        HmacSecret(configuration.application.hmac_secret),
     )
 }
 

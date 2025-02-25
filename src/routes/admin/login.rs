@@ -79,7 +79,7 @@ pub async fn login(
 
             let hmac_tag = {
                 let mut mac =
-                    Hmac::<sha2::Sha256>::new_from_slice(state.secret.expose_secret().as_bytes())
+                    Hmac::<sha2::Sha256>::new_from_slice(state.secret.0.expose_secret().as_bytes())
                         .unwrap();
                 mac.update(query_string.as_bytes());
                 mac.finalize().into_bytes()
@@ -118,7 +118,17 @@ pub async fn login_form(
     query: Query<Option<QueryParams>>,
 ) -> Response {
     let error_html = match query.0 {
-        Some(query) => format!("<p><i>{}</i></p>", htmlescape::encode_minimal(&query.error)),
+        Some(query) => match query.verify(&state.secret) {
+            Ok(error) => format!("<p><i>{}</i></p>", htmlescape::encode_minimal(&error)),
+            Err(e) => {
+                tracing::warn!(
+                    error.message = %e,
+                    error.cause_chain = ?e,
+                    "Failed to verify query parameters using the HMAC tag"
+                );
+                "".into()
+            }
+        },
         None => "".into(),
     };
     let html_template = include_str!("login.html");

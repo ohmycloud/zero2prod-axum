@@ -22,6 +22,7 @@ use uuid::Uuid;
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::EmailClient,
+    startup::HmacSecret,
 };
 
 #[derive(thiserror::Error)]
@@ -103,7 +104,7 @@ pub struct AppState {
     pub db_connection: DatabaseConnection,
     pub email_client: EmailClient,
     pub base_url: String,
-    pub secret: SecretString,
+    pub secret: HmacSecret,
 }
 
 impl TryFrom<FormData> for NewSubscriber {
