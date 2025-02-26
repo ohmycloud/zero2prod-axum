@@ -75,19 +75,7 @@ pub async fn login(
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(error.into()),
             };
 
-            let query_string = format!("error={}", urlencoding::Encoded::new(error.to_string()));
-
-            let hmac_tag = {
-                let mut mac =
-                    Hmac::<sha2::Sha256>::new_from_slice(state.secret.0.expose_secret().as_bytes())
-                        .unwrap();
-                mac.update(query_string.as_bytes());
-                mac.finalize().into_bytes()
-            };
-
-            let response =
-                Redirect::to(format!("/login?{}&tag={:x}", query_string, hmac_tag).as_str())
-                    .into_response();
+            let response = Redirect::to("/login").into_response();
             Err(response)
         }
     }
