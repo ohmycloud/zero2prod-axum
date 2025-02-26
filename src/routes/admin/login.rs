@@ -5,6 +5,7 @@ use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Form, http};
+use axum_extra::extract::cookie::Cookie;
 use handlebars::Handlebars;
 use hmac::{Hmac, Mac};
 use secrecy::{ExposeSecret, SecretString};
@@ -75,10 +76,12 @@ pub async fn login(
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(error.into()),
             };
 
+            let cookie = Cookie::new("_flash", error.to_string());
             let mut response = Redirect::to("/login").into_response();
+
             response.headers_mut().insert(
                 axum::http::header::SET_COOKIE,
-                format!("_flash={error}").parse().unwrap(),
+                cookie.to_string().parse().unwrap(),
             );
             Err(response)
         }
