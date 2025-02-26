@@ -75,7 +75,11 @@ pub async fn login(
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(error.into()),
             };
 
-            let response = Redirect::to("/login").into_response();
+            let mut response = Redirect::to("/login").into_response();
+            response.headers_mut().insert(
+                axum::http::header::SET_COOKIE,
+                format!("_flash={error}").parse().unwrap(),
+            );
             Err(response)
         }
     }
