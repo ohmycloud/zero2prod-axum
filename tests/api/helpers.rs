@@ -46,6 +46,18 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
+    // Our tests will only look at the HTML page, therefore
+    // we do not expose the underlying reqwest::Response
+    pub async fn get_login_html(&self) -> String {
+        reqwest::Client::new()
+            .get(&format!("{}/login", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .text()
+            .await
+            .expect("Failed to read response body.")
+    }
     pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
     where
         Body: serde::Serialize,
