@@ -1,10 +1,12 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{AppState, error_chain_fmt};
 use crate::startup::HmacSecret;
+use axum::body::Body;
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{Request, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Form, http};
+use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
 use handlebars::Handlebars;
 use hmac::{Hmac, Mac};
@@ -107,23 +109,9 @@ impl QueryParams {
     }
 }
 
-#[axum::debug_handler]
-pub async fn login_form(
-    State(state): State<AppState>,
-    query: Query<Option<QueryParams>>,
-) -> Response {
-    let error_html = match query.0 {
-        Some(query) => match query.verify(&state.secret) {
-            Ok(error) => format!("<p><i>{}</i></p>", htmlescape::encode_minimal(&error)),
-            Err(e) => {
-                tracing::warn!(
-                    error.message = %e,
-                    error.cause_chain = ?e,
-                    "Failed to verify query parameters using the HMAC tag"
-                );
-                "".into()
-            }
-        },
+pub async fn login_form(jar: CookieJar) -> (StatusCode, CookieJar, Html<String>) {
+    let error_html = match jar.get("_flash") {
+        Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
         None => "".into(),
     };
     let html_template = include_str!("login.html");
@@ -131,5 +119,7 @@ pub async fn login_form(
     let login_form = reg
         .render_template(html_template, &error_html)
         .expect("Failed to render login form.");
-    Html::from(login_form).into_response()
+
+    let jar = jar.remove("_flash");
+    (StatusCode::OK, jar, Html::from(login_form))
 }
