@@ -120,6 +120,6 @@ pub async fn login_form(jar: CookieJar) -> (StatusCode, CookieJar, Html<String>)
         .render_template(html_template, &error_html)
         .expect("Failed to render login form.");
 
-    let jar = jar.remove("_flash");
+    //let jar = jar.remove("_flash");
     (StatusCode::OK, jar, Html::from(login_form))
 }
