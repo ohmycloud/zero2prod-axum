@@ -14,7 +14,6 @@ use sea_orm::{
     ActiveModelTrait, DatabaseConnection, DatabaseTransaction, Set, TransactionTrait,
     prelude::DateTimeWithTimeZone,
 };
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;

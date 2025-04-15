@@ -1,9 +1,8 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{AppState, error_chain_fmt};
 use crate::startup::HmacSecret;
-use axum::body::Body;
-use axum::extract::{Query, State};
-use axum::http::{Request, StatusCode};
+use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Form, http};
 use axum_extra::extract::CookieJar;

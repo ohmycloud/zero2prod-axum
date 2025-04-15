@@ -1,10 +1,8 @@
 use entity::entities::prelude::*;
-use migration::{Migrator, MigratorTrait};
 use sea_orm::ConnectionTrait;
-use sea_orm::{EntityTrait, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
+use sea_orm::EntityTrait;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
-use zero2prod::configuration::get_configuration;
 
 use crate::helpers::spawn_app;
 
@@ -42,17 +40,9 @@ async fn subscribe_persists_the_new_subscriber() {
     let response = app.post_subscriptions(body.into()).await;
     assert_eq!(200, response.status().as_u16());
 
-    let configuration = get_configuration().expect("Failed to read configuration");
-    let db_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
-    let db_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool);
-
-    Migrator::up(&db_connection, None)
-        .await
-        .expect("Failed to run migrations for tests");
-
     // Assert
     let saved = Subscriptions::find()
-        .one(&db_connection)
+        .one(&app.db_connection)
         .await
         .expect("Failed to fetch data.")
         .expect("No data received.");
