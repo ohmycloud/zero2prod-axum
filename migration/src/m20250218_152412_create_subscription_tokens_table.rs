@@ -1,6 +1,6 @@
 use sea_orm_migration::{prelude::*, schema::*};
 
-use crate::m20250116_212701_create_table::Subscriptions;
+use crate::m20250116_212701_create_subscriptions_table::Subscriptions;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
