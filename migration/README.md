@@ -1,5 +1,12 @@
 # Running Migrator CLI
 
+```bash
+cd migration
+psql -h localhost -p 5432 -U postgres
+create database newsletter;
+cargo run -- fresh
+```
+
 - Generate a new migration file
     ```sh
     cargo run -- generate MIGRATION_NAME
