@@ -1,6 +1,8 @@
 use argon2::password_hash::SaltString;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher};
 use entity::entities::users;
+use migration::{Migrator, MigratorTrait};
+use sea_orm::sqlx::Executor;
 use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set, SqlxPostgresConnector};
 use std::net::TcpListener;
@@ -168,14 +170,14 @@ pub async fn spawn_app() -> TestApp {
     let email_server = MockServer::start().await;
 
     let configuration = {
-        let mut c = get_configuration().expect("Failed to read configuration.");
+        let mut config = get_configuration().expect("Failed to read configuration.");
         // Use a different database for each test case
-        // c.database.database_name = Uuid::new_v4().to_string();
+        config.database.database_name = Uuid::new_v4().to_string();
         // Use a random OS port
-        c.application.port = 0;
+        config.application.port = 0;
         // Use the mock server as email API
-        c.email_client.base_url = email_server.uri();
-        c
+        config.email_client.base_url = email_server.uri();
+        config
     };
 
     // Create and migrate the database
@@ -212,7 +214,25 @@ pub async fn spawn_app() -> TestApp {
 }
 
 async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
-    let db_pool = PgPoolOptions::new().connect_lazy_with(config.with_db());
+    let db_pool = PgPoolOptions::new()
+        .connect_with(config.without_db())
+        .await
+        .expect("Failed to connect to the Postgres.");
+    // Create database
+    db_pool
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .await
+        .expect("Failed to create database.");
+    let db_pool = PgPoolOptions::new()
+        .connect_with(config.with_db())
+        .await
+        .expect("Failed to connect to the Postgres.");
+
+    // Migrate database
+    let database_connection = SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool.clone());
+    Migrator::up(&database_connection, None)
+        .await
+        .expect("Failed to migrate the database");
     SqlxPostgresConnector::from_sqlx_postgres_pool(db_pool)
 }
 
