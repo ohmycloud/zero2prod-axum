@@ -1,21 +1,15 @@
 use crate::authentication::{AuthError, Credentials, validate_credentials};
-use crate::routes::{AppState, error_chain_fmt};
-use crate::startup::HmacSecret;
+use crate::routes::AppState;
+use crate::routes::error_chain_fmt;
+use axum::Form;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::{Form, http};
-use axum_extra::extract::CookieJar;
+use axum::http::header::LOCATION;
+use axum::response::{IntoResponse, Redirect, Response};
 use axum_extra::extract::cookie::Cookie;
-use handlebars::Handlebars;
+use axum_messages::Messages;
 use hmac::{Hmac, Mac};
-use secrecy::{ExposeSecret, SecretString};
-
-#[derive(Debug, serde::Deserialize)]
-pub struct FormData {
-    username: String,
-    password: SecretString,
-}
+use secrecy::SecretString;
 
 #[derive(thiserror::Error)]
 pub enum LoginError {
@@ -43,13 +37,16 @@ impl IntoResponse for LoginError {
 
         Response::builder()
             .status(StatusCode::SEE_OTHER)
-            .header(
-                http::header::LOCATION,
-                format!("/login?{query_string}&tag={hmac_tag:x}"),
-            )
+            .header(LOCATION, format!("/login?{query_string}&tag={hmac_tag:x}"))
             .body(axum::body::Body::empty())
             .unwrap()
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct FormData {
+    username: String,
+    password: SecretString,
 }
 
 #[tracing::instrument(
@@ -87,38 +84,4 @@ pub async fn login(
             Err(response)
         }
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct QueryParams {
-    error: String,
-    tag: String,
-}
-
-impl QueryParams {
-    fn verify(self, secret: &HmacSecret) -> Result<String, anyhow::Error> {
-        let tag = hex::decode(self.tag)?;
-        let query_string = format!("error={}", urlencoding::Encoded::new(&self.error));
-        let mut mac =
-            Hmac::<sha2::Sha256>::new_from_slice(secret.0.expose_secret().as_bytes()).unwrap();
-        mac.update(query_string.as_bytes());
-        mac.verify_slice(&tag)?;
-
-        Ok(self.error)
-    }
-}
-
-pub async fn login_form(jar: CookieJar) -> (StatusCode, CookieJar, Html<String>) {
-    let error_html = match jar.get("_flash") {
-        Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
-        None => "".into(),
-    };
-    let html_template = include_str!("login.html");
-    let reg = Handlebars::new();
-    let login_form = reg
-        .render_template(html_template, &error_html)
-        .expect("Failed to render login form.");
-
-    let jar = jar.remove("_flash");
-    (StatusCode::OK, jar, Html::from(login_form))
 }

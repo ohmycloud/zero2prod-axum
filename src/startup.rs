@@ -11,10 +11,12 @@ use axum::{
     routing::{IntoMakeService, get, post},
     serve::Serve,
 };
+use axum_messages::MessagesManagerLayer;
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
 use secrecy::SecretString;
 use tokio::net::TcpListener;
+use tower_sessions::{MemoryStore, SessionManagerLayer};
 
 type Server = Serve<TcpListener, IntoMakeService<Router>, Router>;
 
@@ -86,9 +88,15 @@ pub fn run(
         base_url,
         secret,
     };
+
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store).with_secure(false);
+
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
+        .layer(MessagesManagerLayer)
+        .layer(session_layer)
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
