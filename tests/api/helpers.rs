@@ -49,6 +49,16 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
+    pub async fn get_admin_dashboard_html(&self) -> String {
+        self.api_client
+            .get(&format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .text()
+            .await
+            .expect("Failed to read response body.")
+    }
     // Our tests will only look at the HTML page, therefore
     // we do not expose the underlying reqwest::Response
     pub async fn get_login_html(&self) -> String {
