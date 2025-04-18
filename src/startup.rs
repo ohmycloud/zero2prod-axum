@@ -2,8 +2,8 @@ use crate::{
     configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
     routes::{
-        AppState, confirm, greet, health_check, home, index, login, login_form, publish_newsletter,
-        subscribe,
+        AppState, admin_dashboard, confirm, greet, health_check, home, index, login, login_form,
+        publish_newsletter, subscribe,
     },
 };
 use axum::{
@@ -122,6 +122,7 @@ pub async fn run(
         .route("/login", get(login_form).post(login))
         .route("/index", get(index))
         .route("/{name}", get(greet))
+        .route("/admin/dashboard", get(admin_dashboard))
         .with_state(app_state.clone());
 
     let listener = TcpListener::from_std(listener)?;
