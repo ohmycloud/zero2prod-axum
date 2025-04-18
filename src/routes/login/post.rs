@@ -71,6 +71,7 @@ pub async fn login(
             let redirect_err = move |e: tower_sessions::session::Error| {
                 login_redirect(flash.clone(), LoginError::UnexpectedError(e.into()))
             };
+            session.cycle_id().await.map_err(&redirect_err)?;
             session
                 .insert_iser_id(user_id)
                 .await
