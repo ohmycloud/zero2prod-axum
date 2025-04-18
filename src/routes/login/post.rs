@@ -7,7 +7,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::http::header::LOCATION;
 use axum::response::{IntoResponse, Redirect, Response};
-use axum_extra::extract::cookie::Cookie;
 use axum_messages::Messages;
 use hmac::{Hmac, Mac};
 use secrecy::SecretString;
@@ -91,6 +90,7 @@ pub async fn login(
     }
 }
 
+// Redirect to the login page with an error message.
 fn login_redirect(flash: Messages, err: LoginError) -> Response {
     flash.error(err.to_string());
     Redirect::to("/login").into_response()

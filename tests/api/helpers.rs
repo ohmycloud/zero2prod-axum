@@ -77,8 +77,6 @@ impl TestApp {
     {
         self.api_client
             .post(&format!("{}/login", &self.address))
-            // This `request` method makes sure that the body is URL-encoded
-            // and the `Content-Type` header is set accordingly.
             .form(body)
             .send()
             .await

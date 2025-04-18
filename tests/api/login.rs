@@ -38,6 +38,7 @@ async fn redirect_to_admin_dashboard_after_login_success() {
 
     // Assert
     let response = app.post_login(&login_body).await;
+    println!("response = {:?}", response);
     assert_is_redirect_to(&response, "/admin/dashboard");
 
     // Act - Part 2 - Follow the redirect
