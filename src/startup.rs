@@ -14,9 +14,11 @@ use axum::{
 use axum_messages::MessagesManagerLayer;
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
+use time::Duration;
 use tokio::net::TcpListener;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
+use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions_redis_store::{RedisStore, fred::prelude::*};
 
 type Server = Serve<TcpListener, IntoMakeService<Router>, Router>;
 
@@ -29,7 +31,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+    pub async fn build(configuration: Settings) -> Result<Self, anyhow::Error> {
         let db_connection = get_db_connection(&configuration.database);
 
         let sender_email = configuration
@@ -59,7 +61,9 @@ impl Application {
             email_client,
             configuration.application.base_url,
             HmacSecret(configuration.application.hmac_secret),
-        )?;
+            configuration.redis_uri,
+        )
+        .await?;
 
         Ok(Self { port, server })
     }
@@ -75,13 +79,14 @@ impl Application {
     }
 }
 
-pub fn run(
+pub async fn run(
     listener: std::net::TcpListener,
     db_connection: DatabaseConnection,
     email_client: EmailClient,
     base_url: String,
     secret: HmacSecret,
-) -> Result<Server, std::io::Error> {
+    redis_uri: SecretString,
+) -> Result<Server, anyhow::Error> {
     let app_state = AppState {
         db_connection,
         email_client,
@@ -89,8 +94,20 @@ pub fn run(
         secret,
     };
 
-    let session_store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(session_store).with_secure(false);
+    let redis_pool = Pool::new(
+        Config::from_url(redis_uri.expose_secret())?,
+        None,
+        None,
+        None,
+        6,
+    )
+    .unwrap();
+    let _redis_conn = redis_pool.connect();
+    redis_pool.wait_for_connect().await?;
+    let redis_store = RedisStore::new(redis_pool);
+    let session_layer = SessionManagerLayer::new(redis_store)
+        .with_secure(false)
+        .with_expiry(Expiry::OnInactivity(Duration::seconds(10)));
 
     let app = Router::new()
         //start OpenTelemetry trace on incoming request
@@ -117,7 +134,7 @@ pub fn run(
     Ok(server)
 }
 
-pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
+pub async fn build(configuration: Settings) -> Result<Server, anyhow::Error> {
     let address = format!(
         "{}:{}",
         configuration.application.host, configuration.application.port
@@ -146,7 +163,9 @@ pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
         email_client,
         configuration.application.base_url,
         HmacSecret(configuration.application.hmac_secret),
+        configuration.redis_uri,
     )
+    .await
 }
 
 pub fn get_db_connection(configuration: &DatabaseSettings) -> DatabaseConnection {
