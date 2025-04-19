@@ -34,3 +34,16 @@ newsletter=# \dt
 
 delete from subscriptions;
 ```
+
+# 启动 Redis
+
+```bash
+. ./scripts/init-redis.sh
+cargo test redirect_to_admin_dashboard_after_login_success
+```
+
+测试时需要启动 Redis 数据库, 否则程序无法构建:
+
+```
+Failed to build application.: IO Error: Os { code: 61, kind: ConnectionRefused, message: "Connection refused" }
+```
