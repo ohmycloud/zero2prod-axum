@@ -5,7 +5,6 @@ use migration::{Migrator, MigratorTrait};
 use sea_orm::sqlx::Executor;
 use sea_orm::sqlx::postgres::PgPoolOptions;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set, SqlxPostgresConnector};
-use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -171,8 +170,8 @@ pub async fn spawn_app() -> TestApp {
     // All other invocations will instead skip execution.
     LazyLock::force(&TRACING);
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    listener.set_nonblocking(true).unwrap();
+    // let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    // listener.set_nonblocking(true).unwrap();
 
     // Launch a mock server to stand in for Postmark's API
     let email_server = MockServer::start().await;

@@ -63,6 +63,7 @@ pub async fn login(
         username: form.username,
         password: form.password,
     };
+    flash.clone().debug(&credentials.username);
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
 
     match validate_credentials(credentials, &state.db_connection).await {
@@ -76,7 +77,7 @@ pub async fn login(
                 .insert_iser_id(user_id)
                 .await
                 .map_err(&redirect_err)?;
-            Ok(Redirect::to("/admin/dashboard").into_response())
+            Ok((StatusCode::SEE_OTHER, Redirect::to("/admin/dashboard")).into_response())
         }
         Err(error) => {
             let error = match error {
@@ -84,7 +85,7 @@ pub async fn login(
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(error.into()),
             };
 
-            flash.error(error.to_string());
+            let _flash = flash.error(error.to_string());
 
             Err(Redirect::to("/login").into_response())
         }

@@ -59,7 +59,10 @@ impl Application {
             listener,
             db_connection,
             email_client,
-            configuration.application.base_url,
+            format!(
+                "{}:{}",
+                configuration.application.base_url, configuration.application.port
+            ),
             HmacSecret(configuration.application.hmac_secret),
             configuration.redis_uri,
         )
@@ -110,10 +113,6 @@ pub async fn run(
         .with_expiry(Expiry::OnInactivity(Duration::seconds(10)));
 
     let app = Router::new()
-        //start OpenTelemetry trace on incoming request
-        .layer(OtelAxumLayer::default())
-        .layer(MessagesManagerLayer)
-        .layer(session_layer)
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
@@ -123,6 +122,10 @@ pub async fn run(
         .route("/index", get(index))
         .route("/{name}", get(greet))
         .route("/admin/dashboard", get(admin_dashboard))
+        //start OpenTelemetry trace on incoming request
+        .layer(OtelAxumLayer::default())
+        .layer(MessagesManagerLayer)
+        .layer(session_layer)
         .with_state(app_state.clone());
 
     let listener = TcpListener::from_std(listener)?;
