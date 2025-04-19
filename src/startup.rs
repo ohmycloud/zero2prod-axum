@@ -2,8 +2,8 @@ use crate::{
     configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
     routes::{
-        AppState, admin_dashboard, confirm, greet, health_check, home, index, login, login_form,
-        publish_newsletter, subscribe,
+        AppState, admin_dashboard, change_password, change_password_form, confirm, greet,
+        health_check, home, index, login, login_form, publish_newsletter, subscribe,
     },
 };
 use axum::{
@@ -122,6 +122,8 @@ pub async fn run(
         .route("/index", get(index))
         .route("/{name}", get(greet))
         .route("/admin/dashboard", get(admin_dashboard))
+        .route("/admin/password", get(change_password_form))
+        .route("/admin/password", post(change_password))
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
         .layer(MessagesManagerLayer)

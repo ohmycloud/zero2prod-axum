@@ -9,7 +9,7 @@ use reqwest::StatusCode;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
-use crate::{routes::AppState, session_state::TypedSession};
+use crate::{routes::AppState, session_state::TypedSession, utils::e500};
 
 pub async fn admin_dashboard(
     State(state): State<AppState>,
@@ -30,14 +30,6 @@ pub async fn admin_dashboard(
         )
         .map_err(e500)?;
     Ok((StatusCode::OK, Html::from(html)).into_response())
-}
-
-fn e500<T>(e: T) -> StatusCode
-where
-    T: std::fmt::Debug + std::fmt::Display + 'static,
-{
-    tracing::error!("{:?}", e);
-    StatusCode::INTERNAL_SERVER_ERROR
 }
 
 #[tracing::instrument(name = "Get username", skip(conn))]
