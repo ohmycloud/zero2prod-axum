@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
             .values_panic([
                 user_id.into(),
                 "admin".into(),
-                "$argon2id$v=19$m=15000,t=2,p=1$Nwfh9G4NKX2nXBmHxbSqcA$GV5+o2o97r8HFOoQHkExXUp82IyVWkh/A6NNQuDFOVg".into(),
+                "$argon2id$v=19$m=15000,t=2,p=1$OEx/rcq+3ts//WUDzGNl2g$Am8UFBA4w5NJEmAtquGvBmAlu92q/VQcaoL5AyJPfc8".into(),
             ])
             .to_owned();
 

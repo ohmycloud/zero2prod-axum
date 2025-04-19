@@ -63,7 +63,6 @@ pub async fn login(
         username: form.username,
         password: form.password,
     };
-    flash.clone().debug(&credentials.username);
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
 
     match validate_credentials(credentials, &state.db_connection).await {
