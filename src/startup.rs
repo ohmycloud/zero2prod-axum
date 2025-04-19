@@ -31,7 +31,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(configuration: Settings) -> Result<Self, anyhow::Error> {
+    pub async fn build(configuration: Settings) -> anyhow::Result<Self, anyhow::Error> {
         let db_connection = get_db_connection(&configuration.database);
 
         let sender_email = configuration
@@ -51,9 +51,9 @@ impl Application {
         );
 
         let listener = std::net::TcpListener::bind(address)?;
-        listener.set_nonblocking(true).unwrap();
+        listener.set_nonblocking(true)?;
 
-        let port = listener.local_addr().unwrap().port();
+        let port = listener.local_addr()?.port();
 
         let server = run(
             listener,
