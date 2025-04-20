@@ -3,7 +3,7 @@ use axum_messages::Messages;
 use handlebars::Handlebars;
 use std::fmt::Write;
 
-use crate::{session_state::TypedSession, utils::reject_anonymous_users};
+use crate::{authentication::reject_anonymous_users, session_state::TypedSession};
 
 pub async fn change_password_form(
     flash: Messages,

@@ -1,7 +1,7 @@
 use axum::response::{IntoResponse, Redirect, Response};
 use axum_messages::Messages;
 
-use crate::{session_state::TypedSession, utils::reject_anonymous_users};
+use crate::{authentication::reject_anonymous_users, session_state::TypedSession};
 
 pub async fn log_out(flash: Messages, session: TypedSession) -> Result<Response, Response> {
     let _user_id = reject_anonymous_users(session.clone()).await?;

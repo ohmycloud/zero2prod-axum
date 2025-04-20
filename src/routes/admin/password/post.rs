@@ -7,10 +7,10 @@ use axum_messages::Messages;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    authentication::{self, AuthError, Credentials, validate_credentials},
+    authentication::{self, AuthError, Credentials, reject_anonymous_users, validate_credentials},
     routes::{AppState, get_username},
     session_state::TypedSession,
-    utils::{e500, reject_anonymous_users},
+    utils::e500,
 };
 
 #[derive(serde::Deserialize)]

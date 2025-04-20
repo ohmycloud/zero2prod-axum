@@ -10,9 +10,8 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
 use crate::{
-    routes::AppState,
-    session_state::TypedSession,
-    utils::{e500, reject_anonymous_users},
+    authentication::reject_anonymous_users, routes::AppState, session_state::TypedSession,
+    utils::e500,
 };
 
 pub async fn admin_dashboard(
