@@ -5,13 +5,12 @@ use axum::{
 };
 use axum_messages::Messages;
 use secrecy::{ExposeSecret, SecretString};
-use uuid::Uuid;
 
 use crate::{
     authentication::{self, AuthError, Credentials, validate_credentials},
     routes::{AppState, get_username},
     session_state::TypedSession,
-    utils::e500,
+    utils::{e500, reject_anonymous_users},
 };
 
 #[derive(serde::Deserialize)]
@@ -27,11 +26,7 @@ pub async fn change_password(
     session: TypedSession,
     Form(form): Form<FormData>,
 ) -> Result<Response, Response> {
-    let user_id = session.get_user_id().await.map_err(e500)?;
-    if user_id.is_none() {
-        return Ok(Redirect::to("/login").into_response());
-    }
-    let user_id = user_id.unwrap();
+    let user_id = reject_anonymous_users(session).await?;
     // SecretString does not implement `Eq`,
     // therefore we need to compare the underlying `String`
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
@@ -70,15 +65,4 @@ pub async fn change_password(
     flash.success("Your password has been changed.");
 
     return Ok(Redirect::to("/admin/password").into_response());
-}
-
-async fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, Response> {
-    match session.get_user_id().await.map_err(e500)? {
-        Some(user_id) => Ok(user_id),
-        None => {
-            let e = anyhow::anyhow!("The user has not logged in");
-            tracing::error!(error = %e, "The user has not logged in");
-            Err(Redirect::to("/login").into_response())
-        }
-    }
 }

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use axum::{
     extract::State,
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Response},
 };
 use entity::entities::prelude::Users;
 use handlebars::Handlebars;
@@ -9,19 +9,21 @@ use reqwest::StatusCode;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
-use crate::{routes::AppState, session_state::TypedSession, utils::e500};
+use crate::{
+    routes::AppState,
+    session_state::TypedSession,
+    utils::{e500, reject_anonymous_users},
+};
 
 pub async fn admin_dashboard(
     State(state): State<AppState>,
     session: TypedSession,
 ) -> Result<Response, Response> {
-    let username = if let Some(user_id) = session.get_user_id().await.map_err(e500)? {
-        get_username(user_id, &state.db_connection)
-            .await
-            .map_err(e500)?
-    } else {
-        return Ok(Redirect::to("/login").into_response());
-    };
+    let user_id = reject_anonymous_users(session).await?;
+    let username = get_username(user_id, &state.db_connection)
+        .await
+        .map_err(e500)?;
+
     let reg = Handlebars::new();
     let html = reg
         .render_template(

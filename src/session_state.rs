@@ -3,6 +3,7 @@ use reqwest::StatusCode;
 use tower_sessions::Session;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct TypedSession(Session);
 
 impl TypedSession {
