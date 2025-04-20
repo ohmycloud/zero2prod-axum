@@ -5,7 +5,7 @@ use anyhow::Context;
 use axum::extract::State;
 use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
-use axum::{Extension, Json};
+use axum::{Extension, Form};
 use entity::entities::{prelude::*, subscriptions};
 use reqwest::StatusCode;
 use sea_orm::prelude::*;
@@ -67,7 +67,7 @@ impl IntoResponse for PublishError {
 pub async fn publish_newsletter(
     State(state): State<AppState>,
     user_id: Extension<UserId>,
-    Json(body): Json<BodyData>,
+    Form(body): Form<BodyData>,
 ) -> Result<Response, PublishError> {
     tracing::info!("Publishing a newsletter issue: {}", *user_id);
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
