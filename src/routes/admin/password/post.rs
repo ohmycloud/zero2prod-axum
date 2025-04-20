@@ -35,10 +35,14 @@ pub async fn change_password(
     // SecretString does not implement `Eq`,
     // therefore we need to compare the underlying `String`
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
-        let _flash = flash.error(
+        flash.error(
             "You entered two different new passwords - \
              the field values must match.",
         );
+        return Ok(Redirect::to("/admin/password").into_response());
+    }
+    if form.new_password.expose_secret().len() < 12 {
+        flash.error("You password is too short!");
         return Ok(Redirect::to("/admin/password").into_response());
     }
     let username = get_username(user_id, &state.db_connection)
