@@ -22,6 +22,10 @@ impl TypedSession {
     pub async fn cycle_id(&self) -> Result<(), tower_sessions::session::Error> {
         self.0.cycle_id().await
     }
+
+    pub async fn log_out(self) -> Result<(), tower_sessions::session::Error> {
+        self.0.flush().await
+    }
 }
 
 impl<S> FromRequestParts<S> for TypedSession
