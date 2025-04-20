@@ -1,16 +1,15 @@
-use super::{AppState, error_chain_fmt};
-use crate::authentication::{AuthError, Credentials, validate_credentials};
+use crate::authentication::UserId;
 use crate::domain::SubscriberEmail;
+use crate::routes::{AppState, error_chain_fmt};
 use anyhow::Context;
-use axum::extract::{Json, State};
-use axum::http::{HeaderMap, HeaderValue};
+use axum::extract::State;
+use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
-use base64::Engine;
+use axum::{Extension, Json};
 use entity::entities::{prelude::*, subscriptions};
 use reqwest::StatusCode;
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
-use secrecy::SecretString;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct BodyData {
@@ -60,61 +59,17 @@ impl IntoResponse for PublishError {
     }
 }
 
-fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Error> {
-    // The header value, if present, must be a valid UTF8 string
-    let header_value = headers
-        .get("Authorization")
-        .context("The 'Authorization' header was missing")?
-        .to_str()
-        .context("The 'Authorization' header was not a valid UTF8 string.")?;
-
-    let base64encoded_segment = header_value
-        .strip_prefix("Basic ")
-        .context("The authorization schema was not 'Basic'.")?;
-    let decoded_bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64encoded_segment)
-        .context("Failed to base64-deocde 'Basic' credentials.")?;
-
-    let decoded_credentials = String::from_utf8(decoded_bytes)
-        .context("The deocded credential string is not valid UTF8.")?;
-
-    // Split into two segments, using ':' as delimiter
-    let mut credentials = decoded_credentials.splitn(2, ':');
-    let username = credentials
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("A username must be provided in 'Basic' auth."))?
-        .to_string();
-    let password = credentials
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("A password must be provided in 'Basic' auth."))?
-        .to_string();
-
-    Ok(Credentials {
-        username,
-        password: SecretString::new(Box::from(password)),
-    })
-}
-
 #[tracing::instrument(
     name = "Publishing a newsletter issue",
-    skip(headers, state, body),
+    skip(state, user_id, body),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
-    headers: HeaderMap,
     State(state): State<AppState>,
+    user_id: Extension<UserId>,
     Json(body): Json<BodyData>,
 ) -> Result<Response, PublishError> {
-    // Bubble up the error, performing the necessary conversion
-    let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
-    tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &state.db_connection)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
-        })?;
-    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+    tracing::info!("Publishing a newsletter issue: {}", *user_id);
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
     for subscriber in subscribers {
         match subscriber {

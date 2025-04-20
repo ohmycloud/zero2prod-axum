@@ -4,7 +4,8 @@ use crate::{
     email_client::EmailClient,
     routes::{
         AppState, admin_dashboard, change_password, change_password_form, confirm, greet,
-        health_check, home, index, log_out, login, login_form, publish_newsletter, subscribe,
+        health_check, home, index, log_out, login, login_form, publish_newsletter,
+        publish_newsletter_form, subscribe,
     },
 };
 use axum::{
@@ -118,6 +119,7 @@ pub async fn run(
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
         .route("/newsletters", post(publish_newsletter))
+        .route("/newsletter", get(publish_newsletter_form))
         .route("/", get(home))
         .route("/login", get(login_form).post(login))
         .route("/index", get(index))
