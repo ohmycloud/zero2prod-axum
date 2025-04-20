@@ -12,15 +12,10 @@ use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
 
 #[derive(Debug, serde::Deserialize)]
-pub struct BodyData {
+pub struct FormData {
     title: String,
-    content: Content,
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct Content {
-    html: String,
-    text: String,
+    text_content: String,
+    html_content: String,
 }
 
 #[derive(Debug)]
@@ -61,13 +56,13 @@ impl IntoResponse for PublishError {
 
 #[tracing::instrument(
     name = "Publishing a newsletter issue",
-    skip(state, user_id, body),
+    skip(state, user_id, form),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
     State(state): State<AppState>,
     user_id: Extension<UserId>,
-    Form(body): Form<BodyData>,
+    Form(form): Form<FormData>,
 ) -> Result<Response, PublishError> {
     tracing::info!("Publishing a newsletter issue: {}", *user_id);
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
@@ -78,9 +73,9 @@ pub async fn publish_newsletter(
                     .email_client
                     .send_email(
                         &subscriber.email,
-                        &body.title,
-                        &body.content.html,
-                        &body.content.text,
+                        &form.title,
+                        &form.html_content,
+                        &form.text_content,
                     )
                     .await
                     .with_context(|| {
@@ -89,7 +84,7 @@ pub async fn publish_newsletter(
             }
             Err(error) => {
                 tracing::warn!(
-                    error.cause_chain= ?error,
+                    error.cause_chain = ?error,
                     "Skipping a confirmed subscriber. \
                     Their stored contact details are invalid",
                 )

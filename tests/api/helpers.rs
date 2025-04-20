@@ -122,7 +122,7 @@ impl TestApp {
         Body: serde::Serialize,
     {
         self.api_client
-            .post(&format!("{}/newsletters", &self.address))
+            .post(&format!("{}/admin/newsletters", &self.address))
             .form(body)
             .send()
             .await
@@ -171,6 +171,14 @@ pub struct TestUser {
 }
 
 impl TestUser {
+    pub async fn login(&self, app: &TestApp) {
+        app.post_login(&serde_json::json!({
+            "username": &self.username,
+            "password": &self.password
+        }))
+        .await;
+    }
+
     pub fn generate() -> Self {
         Self {
             user_id: Uuid::new_v4(),

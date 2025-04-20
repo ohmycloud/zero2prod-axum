@@ -118,8 +118,6 @@ pub async fn run(
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
-        .route("/newsletters", post(publish_newsletter))
-        .route("/newsletter", get(publish_newsletter_form))
         .route("/", get(home))
         .route("/login", get(login_form).post(login))
         .route("/index", get(index))
@@ -127,6 +125,8 @@ pub async fn run(
         .nest(
             "/admin",
             Router::new()
+                .route("/newsletters", post(publish_newsletter))
+                .route("/newsletters", get(publish_newsletter_form))
                 .route("/dashboard", get(admin_dashboard))
                 .route("/password", get(change_password_form))
                 .route("/password", post(change_password))
