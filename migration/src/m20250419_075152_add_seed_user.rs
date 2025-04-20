@@ -1,5 +1,4 @@
-use sea_orm_migration::prelude::*;
-use uuid::Uuid;
+use sea_orm_migration::{prelude::*, sea_orm::prelude::Uuid};
 
 use crate::m20250223_072332_create_users_table::Users;
 
@@ -18,10 +17,18 @@ impl MigrationTrait for Migration {
                 user_id.into(),
                 "admin".into(),
                 "$argon2id$v=19$m=15000,t=2,p=1$OEx/rcq+3ts//WUDzGNl2g$Am8UFBA4w5NJEmAtquGvBmAlu92q/VQcaoL5AyJPfc8".into(),
-            ])
-            .to_owned();
+            ]).to_owned();
 
         manager.exec_stmt(insert).await?;
+        Ok(())
+    }
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let delete = Query::delete()
+            .from_table(Users::Table)
+            .and_where(Expr::col(Users::UserId).eq("ddf8994f-d522-4659-8d02-c1d479057be6"))
+            .to_owned();
+        manager.exec_stmt(delete).await?;
+
         Ok(())
     }
 }

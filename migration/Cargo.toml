@@ -19,4 +19,5 @@ features = [
     # View the list of supported features at https://www.sea-ql.org/SeaORM/docs/install-and-config/database-and-async-runtime.
     "runtime-tokio-rustls", # `ASYNC_RUNTIME` feature
     "sqlx-postgres",        # `DATABASE_DRIVER` feature
+    "with-uuid"
 ]
