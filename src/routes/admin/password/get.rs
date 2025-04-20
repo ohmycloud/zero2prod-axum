@@ -1,15 +1,18 @@
-use axum::response::{Html, IntoResponse, Response};
+use axum::{
+    Extension,
+    response::{Html, IntoResponse, Response},
+};
 use axum_messages::Messages;
 use handlebars::Handlebars;
 use std::fmt::Write;
 
-use crate::{authentication::reject_anonymous_users, session_state::TypedSession};
+use crate::authentication::UserId;
 
 pub async fn change_password_form(
     flash: Messages,
-    session: TypedSession,
+    user_id: Extension<UserId>,
 ) -> Result<Response, Response> {
-    let _user_id = reject_anonymous_users(session).await?;
+    let _user_id = *(user_id.0);
 
     let mut error_html = String::new();
     for m in flash.into_iter() {

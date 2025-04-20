@@ -11,6 +11,7 @@ use axum::{
     routing::{IntoMakeService, get, post},
     serve::Serve,
 };
+use axum_extra::middleware;
 use axum_messages::MessagesManagerLayer;
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
@@ -121,10 +122,14 @@ pub async fn run(
         .route("/login", get(login_form).post(login))
         .route("/index", get(index))
         .route("/{name}", get(greet))
-        .route("/admin/dashboard", get(admin_dashboard))
-        .route("/admin/password", get(change_password_form))
-        .route("/admin/password", post(change_password))
-        .route("/admin/logout", post(log_out))
+        .nest(
+            "/admin",
+            Router::new()
+                .route("/dashboard", get(admin_dashboard))
+                .route("/password", get(change_password_form))
+                .route("/password", post(change_password))
+                .route("/logout", post(log_out)),
+        )
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
         .layer(MessagesManagerLayer)

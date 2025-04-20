@@ -1,5 +1,5 @@
 use axum::{
-    Form,
+    Extension, Form,
     extract::State,
     response::{IntoResponse, Redirect, Response},
 };
@@ -7,9 +7,8 @@ use axum_messages::Messages;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    authentication::{self, AuthError, Credentials, reject_anonymous_users, validate_credentials},
+    authentication::{self, AuthError, Credentials, UserId, validate_credentials},
     routes::{AppState, get_username},
-    session_state::TypedSession,
     utils::e500,
 };
 
@@ -23,10 +22,10 @@ pub struct FormData {
 pub async fn change_password(
     State(state): State<AppState>,
     flash: Messages,
-    session: TypedSession,
+    user_id: Extension<UserId>,
     Form(form): Form<FormData>,
 ) -> Result<Response, Response> {
-    let user_id = reject_anonymous_users(session).await?;
+    let user_id = user_id.0;
     // SecretString does not implement `Eq`,
     // therefore we need to compare the underlying `String`
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
@@ -40,7 +39,7 @@ pub async fn change_password(
         flash.error("You password is too short!");
         return Ok(Redirect::to("/admin/password").into_response());
     }
-    let username = get_username(user_id, &state.db_connection)
+    let username = get_username(*user_id, &state.db_connection)
         .await
         .map_err(e500)?;
     let credentials = Credentials {
@@ -58,7 +57,7 @@ pub async fn change_password(
         };
     }
 
-    authentication::change_password(user_id, form.new_password, &state.db_connection)
+    authentication::change_password(*user_id, form.new_password, &state.db_connection)
         .await
         .map_err(e500)?;
 

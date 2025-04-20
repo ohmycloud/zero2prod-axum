@@ -1,5 +1,6 @@
 use anyhow::Context;
 use axum::{
+    Extension,
     extract::State,
     response::{Html, IntoResponse, Response},
 };
@@ -9,17 +10,14 @@ use reqwest::StatusCode;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use uuid::Uuid;
 
-use crate::{
-    authentication::reject_anonymous_users, routes::AppState, session_state::TypedSession,
-    utils::e500,
-};
+use crate::{authentication::UserId, routes::AppState, utils::e500};
 
 pub async fn admin_dashboard(
     State(state): State<AppState>,
-    session: TypedSession,
+    user_id: Extension<UserId>,
 ) -> Result<Response, Response> {
-    let user_id = reject_anonymous_users(session).await?;
-    let username = get_username(user_id, &state.db_connection)
+    let user_id = user_id.0;
+    let username = get_username(*user_id, &state.db_connection)
         .await
         .map_err(e500)?;
 
