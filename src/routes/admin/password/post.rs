@@ -1,12 +1,18 @@
 use axum::{
     Form,
+    extract::State,
     response::{IntoResponse, Redirect, Response},
 };
 use axum_messages::Messages;
 use reqwest::StatusCode;
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::{session_state::TypedSession, utils::e500};
+use crate::{
+    authentication::{AuthError, Credentials, validate_credentials},
+    routes::{AppState, get_username},
+    session_state::TypedSession,
+    utils::e500,
+};
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -16,13 +22,16 @@ pub struct FormData {
 }
 
 pub async fn change_password(
+    State(state): State<AppState>,
     flash: Messages,
     session: TypedSession,
     Form(form): Form<FormData>,
 ) -> Result<Response, StatusCode> {
-    if session.get_user_id().await.map_err(e500)?.is_none() {
+    let user_id = session.get_user_id().await.map_err(e500)?;
+    if user_id.is_none() {
         return Ok(Redirect::to("/login").into_response());
     }
+    let user_id = user_id.unwrap();
     // SecretString does not implement `Eq`,
     // therefore we need to compare the underlying `String`
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
@@ -32,5 +41,23 @@ pub async fn change_password(
         );
         return Ok(Redirect::to("/admin/password").into_response());
     }
+    let username = get_username(user_id, &state.db_connection)
+        .await
+        .map_err(e500)?;
+    let credentials = Credentials {
+        username,
+        password: form.current_password,
+    };
+
+    if let Err(e) = validate_credentials(credentials, &state.db_connection).await {
+        return match e {
+            AuthError::InvalidCredentials(_) => {
+                flash.error("The current password is incorrect.");
+                Ok(Redirect::to("/admin/password").into_response())
+            }
+            AuthError::UnexpectedError(_) => Err(e500(e.to_string())),
+        };
+    }
+
     return Ok(Redirect::to("/login").into_response());
 }

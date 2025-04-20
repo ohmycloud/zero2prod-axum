@@ -33,7 +33,10 @@ pub async fn admin_dashboard(
 }
 
 #[tracing::instrument(name = "Get username", skip(conn))]
-async fn get_username(user_id: Uuid, conn: &DatabaseConnection) -> Result<String, anyhow::Error> {
+pub async fn get_username(
+    user_id: Uuid,
+    conn: &DatabaseConnection,
+) -> Result<String, anyhow::Error> {
     let user = Users::find_by_id(user_id)
         .one(conn)
         .await
