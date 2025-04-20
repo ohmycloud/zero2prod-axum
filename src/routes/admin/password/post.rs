@@ -8,7 +8,7 @@ use reqwest::StatusCode;
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    authentication::{AuthError, Credentials, validate_credentials},
+    authentication::{self, AuthError, Credentials, validate_credentials},
     routes::{AppState, get_username},
     session_state::TypedSession,
     utils::e500,
@@ -63,5 +63,11 @@ pub async fn change_password(
         };
     }
 
-    return Ok(Redirect::to("/login").into_response());
+    authentication::change_password(user_id, form.new_password, &state.db_connection)
+        .await
+        .map_err(e500)?;
+
+    flash.success("Your password has been changed.");
+
+    return Ok(Redirect::to("/admin/password").into_response());
 }

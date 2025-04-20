@@ -1,6 +1,8 @@
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::password_hash::SaltString;
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use entity::entities::{prelude::*, users};
+use migration::SimpleExpr;
 use sea_orm::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter};
 use secrecy::{ExposeSecret, SecretString};
@@ -90,4 +92,38 @@ async fn get_stored_credentials(
         });
 
     Ok(user)
+}
+
+#[tracing::instrument(name = "Change password", skip(password, db_connection))]
+pub async fn change_password(
+    user_id: uuid::Uuid,
+    password: SecretString,
+    db_connection: &DatabaseConnection,
+) -> Result<(), anyhow::Error> {
+    let password_hash = spawn_blocking_with_tracing(move || compute_password_hash(password))
+        .await?
+        .context("Failed to hash password")?;
+    Users::update_many()
+        .col_expr(
+            users::Column::PasswordHash,
+            SimpleExpr::Value(Value::String(Some(Box::new(
+                password_hash.expose_secret().to_string(),
+            )))),
+        )
+        .filter(users::Column::UserId.eq(user_id))
+        .exec(db_connection)
+        .await?;
+    Ok(())
+}
+
+fn compute_password_hash(password: SecretString) -> Result<SecretString, anyhow::Error> {
+    let salt = SaltString::generate(&mut rand::thread_rng());
+    let password_hash = Argon2::new(
+        Algorithm::Argon2i,
+        Version::V0x13,
+        Params::new(15000, 2, 1, None).unwrap(),
+    )
+    .hash_password(password.expose_secret().as_bytes(), &salt)?
+    .to_string();
+    Ok(SecretString::new(Box::from(password_hash)))
 }
