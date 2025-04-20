@@ -1,4 +1,5 @@
 use crate::{
+    authentication::reject_anonymous_users,
     configuration::{DatabaseSettings, Settings, get_configuration},
     email_client::EmailClient,
     routes::{
@@ -11,7 +12,6 @@ use axum::{
     routing::{IntoMakeService, get, post},
     serve::Serve,
 };
-use axum_extra::middleware;
 use axum_messages::MessagesManagerLayer;
 use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector, sqlx::postgres::PgPoolOptions};
@@ -128,7 +128,8 @@ pub async fn run(
                 .route("/dashboard", get(admin_dashboard))
                 .route("/password", get(change_password_form))
                 .route("/password", post(change_password))
-                .route("/logout", post(log_out)),
+                .route("/logout", post(log_out))
+                .layer(axum::middleware::from_fn(reject_anonymous_users)),
         )
         //start OpenTelemetry trace on incoming request
         .layer(OtelAxumLayer::default())
