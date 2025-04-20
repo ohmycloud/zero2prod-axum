@@ -4,8 +4,8 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
 };
 use axum_messages::Messages;
-use reqwest::StatusCode;
 use secrecy::{ExposeSecret, SecretString};
+use uuid::Uuid;
 
 use crate::{
     authentication::{self, AuthError, Credentials, validate_credentials},
@@ -26,7 +26,7 @@ pub async fn change_password(
     flash: Messages,
     session: TypedSession,
     Form(form): Form<FormData>,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, Response> {
     let user_id = session.get_user_id().await.map_err(e500)?;
     if user_id.is_none() {
         return Ok(Redirect::to("/login").into_response());
@@ -70,4 +70,15 @@ pub async fn change_password(
     flash.success("Your password has been changed.");
 
     return Ok(Redirect::to("/admin/password").into_response());
+}
+
+async fn reject_anonymous_users(session: TypedSession) -> Result<Uuid, Response> {
+    match session.get_user_id().await.map_err(e500)? {
+        Some(user_id) => Ok(user_id),
+        None => {
+            let e = anyhow::anyhow!("The user has not logged in");
+            tracing::error!(error = %e, "The user has not logged in");
+            Err(Redirect::to("/login").into_response())
+        }
+    }
 }

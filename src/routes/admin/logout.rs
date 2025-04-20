@@ -1,10 +1,9 @@
 use axum::response::{IntoResponse, Redirect, Response};
 use axum_messages::Messages;
-use reqwest::StatusCode;
 
 use crate::{session_state::TypedSession, utils::e500};
 
-pub async fn log_out(flash: Messages, session: TypedSession) -> Result<Response, StatusCode> {
+pub async fn log_out(flash: Messages, session: TypedSession) -> Result<Response, Response> {
     if session.get_user_id().await.map_err(e500)?.is_none() {
         Ok(Redirect::to("/login").into_response())
     } else {

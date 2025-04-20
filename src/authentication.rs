@@ -103,6 +103,7 @@ pub async fn change_password(
     let password_hash = spawn_blocking_with_tracing(move || compute_password_hash(password))
         .await?
         .context("Failed to hash password")?;
+
     Users::update_many()
         .col_expr(
             users::Column::PasswordHash,

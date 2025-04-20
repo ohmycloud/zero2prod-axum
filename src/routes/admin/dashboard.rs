@@ -14,7 +14,7 @@ use crate::{routes::AppState, session_state::TypedSession, utils::e500};
 pub async fn admin_dashboard(
     State(state): State<AppState>,
     session: TypedSession,
-) -> Result<Response, StatusCode> {
+) -> Result<Response, Response> {
     let username = if let Some(user_id) = session.get_user_id().await.map_err(e500)? {
         get_username(user_id, &state.db_connection)
             .await
