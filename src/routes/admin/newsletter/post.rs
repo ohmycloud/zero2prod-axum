@@ -1,6 +1,8 @@
 use crate::authentication::UserId;
 use crate::domain::SubscriberEmail;
+use crate::idempotency::IdempotencyKey;
 use crate::routes::{AppState, error_chain_fmt};
+use crate::utils::e400;
 use anyhow::Context;
 use axum::extract::State;
 use axum::http::HeaderValue;
@@ -16,6 +18,7 @@ pub struct FormData {
     title: String,
     text_content: String,
     html_content: String,
+    idempotency_key: String,
 }
 
 #[derive(Debug)]
@@ -64,6 +67,8 @@ pub async fn publish_newsletter(
     user_id: Extension<UserId>,
     Form(form): Form<FormData>,
 ) -> Result<Response, PublishError> {
+    let idempotency_key: IdempotencyKey = form.idempotency_key.try_into().map_err(e400).unwrap();
+
     tracing::info!("Publishing a newsletter issue: {}", *user_id);
     let subscribers = get_confirmed_subscribers(&state.db_connection).await?;
     for subscriber in subscribers {
