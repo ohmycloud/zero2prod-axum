@@ -6,6 +6,12 @@ enum HeaderPairIden {
     HeaderPair,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct HeaderPairRecord {
+    pub name: String,
+    pub value: Vec<u8>,
+}
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -60,7 +66,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Idempotency {
+pub enum Idempotency {
     Table,
     UserId,
     IdempotencyKey,

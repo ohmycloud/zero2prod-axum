@@ -13,6 +13,7 @@ pub async fn publish_newsletter_form(
     user_id: Extension<UserId>,
 ) -> Result<Response, Response> {
     let _user_id = *(user_id.0);
+    let idempotency_key = uuid::Uuid::new_v4();
     let mut msg_html = String::new();
     for m in flash.into_iter() {
         writeln!(msg_html, "<p><i>{}</i></p>", m.message).unwrap();
@@ -23,6 +24,7 @@ pub async fn publish_newsletter_form(
             include_str!("get.html"),
             &serde_json::json!({
                 "messages": msg_html,
+                "idempotency_key": idempotency_key,
             }),
         )
         .expect("Failed to render password page.");

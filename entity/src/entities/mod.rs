@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod idempotency;
 pub mod subscription_tokens;
 pub mod subscriptions;
 pub mod users;
