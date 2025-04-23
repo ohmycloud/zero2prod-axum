@@ -22,3 +22,12 @@ pub async fn get_saved_response(
     }
     Ok(Some("".into_response()))
 }
+
+pub async fn save_response(
+    db_connection: &DatabaseConnection,
+    idempotency_key: &IdempotencyKey,
+    user_id: Uuid,
+    http_response: &Response,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
