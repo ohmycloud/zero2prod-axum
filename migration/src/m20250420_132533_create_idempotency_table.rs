@@ -30,15 +30,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(uuid(Idempotency::UserId).not_null())
                     .col(string(Idempotency::IdempotencyKey).not_null())
-                    .col(small_integer(Idempotency::ResponseStatusCode).not_null())
-                    .col(
-                        array(
-                            Idempotency::ResponseHeaders,
-                            ColumnType::Custom(SeaRc::new(HeaderPairIden::HeaderPair)),
-                        )
-                        .not_null(),
-                    )
-                    .col(binary(Idempotency::ResponseBody).not_null())
+                    .col(small_integer(Idempotency::ResponseStatusCode))
+                    .col(array(
+                        Idempotency::ResponseHeaders,
+                        ColumnType::Custom(SeaRc::new(HeaderPairIden::HeaderPair)),
+                    ))
+                    .col(binary(Idempotency::ResponseBody))
                     .col(timestamp_with_time_zone(Idempotency::CreatedAt).not_null())
                     .primary_key(
                         Index::create()
